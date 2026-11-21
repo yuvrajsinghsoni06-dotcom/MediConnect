@@ -11,6 +11,18 @@ import { RegisterPage } from '../pages/auth/RegisterPage';
 import { ForgotPasswordPage } from '../pages/auth/ForgotPasswordPage';
 import { NotFoundPage } from '../pages/public/NotFoundPage';
 
+// Blood Safety & Donor Health Verification Module Pages
+import { SafetyAuthProvider } from '../context/SafetyAuthContext';
+import { SafetyDashboardPage } from '../pages/bloodSafety/SafetyDashboardPage';
+import { DonorAssessmentPage } from '../pages/bloodSafety/DonorAssessmentPage';
+import { DonationsListPage } from '../pages/bloodSafety/DonationsListPage';
+import { DonationDetailPage } from '../pages/bloodSafety/DonationDetailPage';
+import { LaboratoryTestingPage } from '../pages/bloodSafety/LaboratoryTestingPage';
+import { QuarantineManagementPage } from '../pages/bloodSafety/QuarantineManagementPage';
+import { ClinicalReviewPage } from '../pages/bloodSafety/ClinicalReviewPage';
+import { ConfidentialFollowUpPage } from '../pages/bloodSafety/ConfidentialFollowUpPage';
+import { AuditLogsPage } from '../pages/bloodSafety/AuditLogsPage';
+
 export const AppRoutes = () => {
   return (
     <Routes>
@@ -27,6 +39,80 @@ export const AppRoutes = () => {
         <Route path="/login" element={<LoginPage />} />
         <Route path="/register" element={<RegisterPage />} />
         <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+
+        {/* Blood Safety & Donor Health Verification Module */}
+        <Route
+          path="/blood-safety"
+          element={
+            <SafetyAuthProvider>
+              <SafetyDashboardPage />
+            </SafetyAuthProvider>
+          }
+        />
+        <Route
+          path="/blood-safety/donor-assessment"
+          element={
+            <SafetyAuthProvider>
+              <DonorAssessmentPage />
+            </SafetyAuthProvider>
+          }
+        />
+        <Route
+          path="/blood-safety/donations"
+          element={
+            <SafetyAuthProvider>
+              <DonationsListPage />
+            </SafetyAuthProvider>
+          }
+        />
+        <Route
+          path="/blood-safety/donation/:id"
+          element={
+            <SafetyAuthProvider>
+              <DonationDetailPage />
+            </SafetyAuthProvider>
+          }
+        />
+        <Route
+          path="/blood-safety/laboratory"
+          element={
+            <SafetyAuthProvider>
+              <LaboratoryTestingPage />
+            </SafetyAuthProvider>
+          }
+        />
+        <Route
+          path="/blood-safety/quarantine"
+          element={
+            <SafetyAuthProvider>
+              <QuarantineManagementPage />
+            </SafetyAuthProvider>
+          }
+        />
+        <Route
+          path="/blood-safety/clinical-review"
+          element={
+            <SafetyAuthProvider>
+              <ClinicalReviewPage />
+            </SafetyAuthProvider>
+          }
+        />
+        <Route
+          path="/blood-safety/follow-up"
+          element={
+            <SafetyAuthProvider>
+              <ConfidentialFollowUpPage />
+            </SafetyAuthProvider>
+          }
+        />
+        <Route
+          path="/blood-safety/audit-logs"
+          element={
+            <SafetyAuthProvider>
+              <AuditLogsPage />
+            </SafetyAuthProvider>
+          }
+        />
 
         {/* 404 Catch-All */}
         <Route path="*" element={<NotFoundPage />} />

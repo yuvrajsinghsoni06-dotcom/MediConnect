@@ -14,6 +14,7 @@ export const Navbar = () => {
     { name: 'About', path: '/about' },
     { name: 'Find Donors', path: '/find-donors' },
     { name: 'Campaigns', path: '/campaigns' },
+    { name: 'Blood Safety', path: '/blood-safety' },
     { name: 'Contact', path: '/contact' },
   ];
 
