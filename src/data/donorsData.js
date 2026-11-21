@@ -1,11 +1,14 @@
 /**
  * Mock Donor Data for MediConnect (Stage 1 Demonstration)
  * 
- * IMPORTANT PRIVACY & SAFETY NOTE:
- * In accordance with healthcare data protection principles:
- * - No personal phone numbers or exact residential street addresses are stored or shown.
- * - Only generalized municipal areas/cities are displayed.
+ * IMPORTANT HEALTHCARE SAFETY & PRIVACY NOTE:
+ * - No personal phone numbers or exact residential street addresses are stored or displayed.
+ * - Only generalized municipal areas and cities are shown.
  * - All displayed records are fictional illustrative samples for platform demonstration.
+ * - Coordination responsiveness is an illustrative participation index, NOT a clinical
+ *   fitness score or medical clearance.
+ * - Final donor eligibility, hemoglobin verification, vital checks, and ABO/Rh
+ *   compatibility must be conducted on-site by certified healthcare professionals.
  */
 
 export const mockDonors = [
@@ -18,10 +21,12 @@ export const mockDonors = [
     approximateDistanceKm: 3.2,
     availability: "Available Now",
     isVerified: true,
+    verificationLabel: "Identity Verified (Demo)",
     totalDonations: 8,
     lastDonatedDaysAgo: 110,
-    readinessScore: 98,
-    eligibleNextDonation: "Eligible today",
+    coordinationResponsiveness: 98,
+    donationIntervalPassed: true,
+    intervalStatusNote: "Standard 90-day whole blood interval elapsed; clinical on-site screening required",
     badges: ["Regular Donor", "Platelet Registered"]
   },
   {
@@ -33,11 +38,13 @@ export const mockDonors = [
     approximateDistanceKm: 5.6,
     availability: "Available Now",
     isVerified: true,
+    verificationLabel: "Identity Verified (Demo)",
     totalDonations: 12,
     lastDonatedDaysAgo: 145,
-    readinessScore: 95,
-    eligibleNextDonation: "Eligible today",
-    badges: ["Silver Lifesaver", "Emergency Responder"]
+    coordinationResponsiveness: 95,
+    donationIntervalPassed: true,
+    intervalStatusNote: "Standard donation interval elapsed; clinical on-site screening required",
+    badges: ["Frequent Lifesaver", "Emergency Responder"]
   },
   {
     id: "dnr-003",
@@ -48,10 +55,12 @@ export const mockDonors = [
     approximateDistanceKm: 4.1,
     availability: "Available Now",
     isVerified: true,
+    verificationLabel: "Identity Verified (Demo)",
     totalDonations: 6,
     lastDonatedDaysAgo: 98,
-    readinessScore: 92,
-    eligibleNextDonation: "Eligible today",
+    coordinationResponsiveness: 92,
+    donationIntervalPassed: true,
+    intervalStatusNote: "Standard donation interval elapsed; clinical on-site screening required",
     badges: ["Youth Ambassador"]
   },
   {
@@ -63,10 +72,12 @@ export const mockDonors = [
     approximateDistanceKm: 2.8,
     availability: "Within 24 Hours",
     isVerified: true,
+    verificationLabel: "Identity Verified (Demo)",
     totalDonations: 5,
     lastDonatedDaysAgo: 130,
-    readinessScore: 89,
-    eligibleNextDonation: "Eligible today",
+    coordinationResponsiveness: 89,
+    donationIntervalPassed: true,
+    intervalStatusNote: "Standard donation interval elapsed; clinical on-site screening required",
     badges: ["Universal Receiver"]
   },
   {
@@ -78,10 +89,12 @@ export const mockDonors = [
     approximateDistanceKm: 6.4,
     availability: "Available Now",
     isVerified: true,
+    verificationLabel: "Identity Verified (Demo)",
     totalDonations: 15,
     lastDonatedDaysAgo: 160,
-    readinessScore: 99,
-    eligibleNextDonation: "Eligible today",
+    coordinationResponsiveness: 99,
+    donationIntervalPassed: true,
+    intervalStatusNote: "Standard donation interval elapsed; clinical on-site screening required",
     badges: ["Golden Donor", "Rare Group Hero"]
   },
   {
@@ -93,10 +106,12 @@ export const mockDonors = [
     approximateDistanceKm: 3.9,
     availability: "Available Now",
     isVerified: false,
+    verificationLabel: "Unverified Community Profile",
     totalDonations: 3,
     lastDonatedDaysAgo: 105,
-    readinessScore: 86,
-    eligibleNextDonation: "Eligible today",
+    coordinationResponsiveness: 86,
+    donationIntervalPassed: true,
+    intervalStatusNote: "Standard donation interval elapsed; clinical on-site screening required",
     badges: ["New Donor"]
   },
   {
@@ -108,10 +123,12 @@ export const mockDonors = [
     approximateDistanceKm: 7.1,
     availability: "Within 24 Hours",
     isVerified: true,
+    verificationLabel: "Identity Verified (Demo)",
     totalDonations: 9,
     lastDonatedDaysAgo: 125,
-    readinessScore: 94,
-    eligibleNextDonation: "Eligible today",
+    coordinationResponsiveness: 94,
+    donationIntervalPassed: true,
+    intervalStatusNote: "Standard donation interval elapsed; clinical on-site screening required",
     badges: ["Community Champion"]
   },
   {
@@ -123,10 +140,12 @@ export const mockDonors = [
     approximateDistanceKm: 4.8,
     availability: "Available Now",
     isVerified: true,
+    verificationLabel: "Identity Verified (Demo)",
     totalDonations: 7,
     lastDonatedDaysAgo: 180,
-    readinessScore: 96,
-    eligibleNextDonation: "Eligible today",
+    coordinationResponsiveness: 96,
+    donationIntervalPassed: true,
+    intervalStatusNote: "Standard donation interval elapsed; clinical on-site screening required",
     badges: ["Rare Group Hero"]
   },
   {
@@ -138,10 +157,12 @@ export const mockDonors = [
     approximateDistanceKm: 5.1,
     availability: "Available Now",
     isVerified: true,
+    verificationLabel: "Identity Verified (Demo)",
     totalDonations: 11,
     lastDonatedDaysAgo: 115,
-    readinessScore: 97,
-    eligibleNextDonation: "Eligible today",
+    coordinationResponsiveness: 97,
+    donationIntervalPassed: true,
+    intervalStatusNote: "Standard donation interval elapsed; clinical on-site screening required",
     badges: ["Emergency Squad"]
   },
   {
@@ -153,10 +174,12 @@ export const mockDonors = [
     approximateDistanceKm: 2.3,
     availability: "Available Now",
     isVerified: true,
+    verificationLabel: "Identity Verified (Demo)",
     totalDonations: 4,
     lastDonatedDaysAgo: 92,
-    readinessScore: 90,
-    eligibleNextDonation: "Eligible today",
+    coordinationResponsiveness: 90,
+    donationIntervalPassed: true,
+    intervalStatusNote: "Standard donation interval elapsed; clinical on-site screening required",
     badges: ["Hospital Volunteer"]
   },
   {
@@ -168,10 +191,12 @@ export const mockDonors = [
     approximateDistanceKm: 3.5,
     availability: "Within 24 Hours",
     isVerified: true,
+    verificationLabel: "Identity Verified (Demo)",
     totalDonations: 8,
     lastDonatedDaysAgo: 140,
-    readinessScore: 93,
-    eligibleNextDonation: "Eligible today",
+    coordinationResponsiveness: 93,
+    donationIntervalPassed: true,
+    intervalStatusNote: "Standard donation interval elapsed; clinical on-site screening required",
     badges: ["Regular Donor"]
   },
   {
@@ -183,10 +208,12 @@ export const mockDonors = [
     approximateDistanceKm: 6.8,
     availability: "Available Now",
     isVerified: true,
+    verificationLabel: "Identity Verified (Demo)",
     totalDonations: 14,
     lastDonatedDaysAgo: 155,
-    readinessScore: 99,
-    eligibleNextDonation: "Eligible today",
+    coordinationResponsiveness: 99,
+    donationIntervalPassed: true,
+    intervalStatusNote: "Standard donation interval elapsed; clinical on-site screening required",
     badges: ["Golden Donor", "Universal Donor Hero"]
   },
   {
@@ -198,10 +225,12 @@ export const mockDonors = [
     approximateDistanceKm: 4.2,
     availability: "Available Now",
     isVerified: true,
+    verificationLabel: "Identity Verified (Demo)",
     totalDonations: 5,
     lastDonatedDaysAgo: 100,
-    readinessScore: 91,
-    eligibleNextDonation: "Eligible today",
+    coordinationResponsiveness: 91,
+    donationIntervalPassed: true,
+    intervalStatusNote: "Standard donation interval elapsed; clinical on-site screening required",
     badges: ["Community Champion"]
   },
   {
@@ -213,10 +242,12 @@ export const mockDonors = [
     approximateDistanceKm: 5.9,
     availability: "Available Now",
     isVerified: true,
+    verificationLabel: "Identity Verified (Demo)",
     totalDonations: 6,
     lastDonatedDaysAgo: 112,
-    readinessScore: 88,
-    eligibleNextDonation: "Eligible today",
+    coordinationResponsiveness: 88,
+    donationIntervalPassed: true,
+    intervalStatusNote: "Standard donation interval elapsed; clinical on-site screening required",
     badges: ["Universal Receiver"]
   }
 ];

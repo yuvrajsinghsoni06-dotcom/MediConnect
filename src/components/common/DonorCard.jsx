@@ -4,14 +4,13 @@ import { BloodGroupBadge } from '../ui/BloodGroupBadge';
 import { Badge } from '../ui/Badge';
 import { Button } from '../ui/Button';
 import { Modal } from '../ui/Modal';
-import { MapPin, CheckCircle, Clock, ShieldCheck, Heart, Send, AlertCircle } from 'lucide-react';
+import { MapPin, CheckCircle, Clock, ShieldCheck, Send, AlertCircle, Info } from 'lucide-react';
 
 export const DonorCard = ({ donor }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [requestSent, setRequestSent] = useState(false);
 
   const {
-    id,
     fullName,
     bloodGroup,
     city,
@@ -19,9 +18,11 @@ export const DonorCard = ({ donor }) => {
     approximateDistanceKm,
     availability,
     isVerified,
+    verificationLabel,
     totalDonations,
     lastDonatedDaysAgo,
-    readinessScore,
+    coordinationResponsiveness,
+    intervalStatusNote,
     badges = [],
   } = donor;
 
@@ -29,9 +30,6 @@ export const DonorCard = ({ donor }) => {
 
   const handleSendCoordinationRequest = () => {
     setRequestSent(true);
-    setTimeout(() => {
-      // Auto-reset state after demo confirmation
-    }, 4000);
   };
 
   return (
@@ -48,7 +46,10 @@ export const DonorCard = ({ donor }) => {
                     {fullName}
                   </h3>
                   {isVerified && (
-                    <CheckCircle className="w-4 h-4 text-[#16A34A] shrink-0" title="Verified Volunteer Donor" />
+                    <CheckCircle
+                      className="w-4 h-4 text-[#16A34A] shrink-0"
+                      title={verificationLabel || "Identity Verified Profile (Demo)"}
+                    />
                   )}
                 </div>
                 <div className="flex items-center gap-1 text-xs text-[#64748B] mt-0.5">
@@ -74,8 +75,8 @@ export const DonorCard = ({ donor }) => {
               <span className="font-semibold text-[#0F172A]">~{approximateDistanceKm} km away</span>
             </div>
             <div>
-              <span className="text-[#64748B] block">Total Donations</span>
-              <span className="font-semibold text-[#0F172A]">{totalDonations} times</span>
+              <span className="text-[#64748B] block">Lifetime Donations</span>
+              <span className="font-semibold text-[#0F172A]">{totalDonations} completed</span>
             </div>
           </div>
 
@@ -118,23 +119,30 @@ export const DonorCard = ({ donor }) => {
           setRequestSent(false);
         }}
         title={`Donor Profile — ${fullName}`}
-        subtitle="Privacy-Preserving Volunteer Coordination Relay"
+        subtitle="Preliminary Coordination Profile • Fictional Demo Record"
       >
         <div className="space-y-4 text-sm">
-          {/* Blood group and readiness overview */}
+          {/* Blood group and coordination index overview */}
           <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-between">
             <div className="flex items-center gap-3">
               <BloodGroupBadge group={bloodGroup} size="xl" />
               <div>
-                <span className="text-xs uppercase tracking-wide font-bold text-slate-500">Readiness Score</span>
+                <span className="text-xs uppercase tracking-wide font-bold text-slate-500">
+                  Coordination Responsiveness
+                </span>
                 <div className="text-xl font-extrabold text-[#0F172A] flex items-center gap-1.5">
-                  <span>{readinessScore}%</span>
-                  <span className="text-xs font-normal text-[#16A34A] bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">Optimal</span>
+                  <span>{coordinationResponsiveness}%</span>
+                  <span className="text-xs font-normal text-[#16A34A] bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+                    High Response Rate
+                  </span>
                 </div>
+                <span className="text-[11px] text-slate-400 block mt-0.5">
+                  Based on historical alert acknowledgment; not a clinical fitness score.
+                </span>
               </div>
             </div>
             <div className="text-right">
-              <span className="text-xs text-[#64748B] block">Status</span>
+              <span className="text-xs text-[#64748B] block">Availability</span>
               <Badge variant={isAvailableNow ? 'green' : 'amber'} dot size="md">
                 {availability}
               </Badge>
@@ -165,8 +173,17 @@ export const DonorCard = ({ donor }) => {
               <span className="font-semibold text-slate-900">{totalDonations} verified units</span>
             </div>
             <div>
-              <span className="text-slate-500 block">Last Donated</span>
-              <span className="font-semibold text-slate-900">{lastDonatedDaysAgo} days ago (Eligible)</span>
+              <span className="text-slate-500 block">Last Self-Reported Donation</span>
+              <span className="font-semibold text-slate-900">{lastDonatedDaysAgo} days ago</span>
+            </div>
+          </div>
+
+          {/* Clinical Screening Advisory */}
+          <div className="p-3 rounded-lg bg-amber-50/70 border border-amber-200 text-xs text-amber-900 flex items-start gap-2">
+            <AlertCircle className="w-4 h-4 text-[#F59E0B] shrink-0 mt-0.5" />
+            <div>
+              <strong>Preliminary Coordination Only: </strong>
+              {intervalStatusNote || "Standard time interval elapsed. Final medical eligibility, hemoglobin screening, and transfusion compatibility must be confirmed at the licensed donation facility."}
             </div>
           </div>
 
@@ -178,7 +195,7 @@ export const DonorCard = ({ donor }) => {
               </div>
               <h4 className="font-bold text-[#16A34A]">Coordination Ping Sent (Demo)</h4>
               <p className="text-xs text-slate-600 max-w-sm mx-auto">
-                In the complete system, an SMS/push notification is routed to {fullName} with your verified hospital case ID.
+                In the complete system, an authenticated alert is routed to {fullName} with your verified hospital case ID without exchanging phone numbers.
               </p>
               <Button
                 variant="secondary"

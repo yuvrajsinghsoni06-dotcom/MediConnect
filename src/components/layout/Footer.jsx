@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Droplet, Heart, ShieldCheck, Mail, Phone, MapPin, ExternalLink, Globe } from 'lucide-react';
+import { Droplet, ShieldCheck, Mail, Phone, MapPin } from 'lucide-react';
 import { DEMO_CONTACT_INFO } from '../../utils/constants';
 import { Modal } from '../ui/Modal';
 

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Link, NavLink, useNavigate } from 'react-router-dom';
-import { Heart, Menu, X, Droplet, AlertCircle, UserPlus, LogIn } from 'lucide-react';
+import { Menu, X, Droplet, AlertCircle, UserPlus, LogIn } from 'lucide-react';
 import { Button } from '../ui/Button';
 import { EmergencyRequestModal } from '../common/EmergencyRequestModal';
 

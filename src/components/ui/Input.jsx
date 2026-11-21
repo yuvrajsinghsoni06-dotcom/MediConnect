@@ -11,7 +11,7 @@ export const Input = React.forwardRef(({
   required = false,
   ...props
 }, ref) => {
-  const inputId = id || (label ? label.toLowerCase().replace(/\s+/g, '-') : undefined);
+  const inputId = id || (label ? label.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') : undefined);
 
   return (
     <div className="w-full">

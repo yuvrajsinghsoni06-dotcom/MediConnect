@@ -11,7 +11,6 @@ import {
   ArrowRight,
   AlertCircle,
   Clock,
-  Sparkles,
   PhoneCall,
   Activity,
   Award,

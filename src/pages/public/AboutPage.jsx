@@ -1,12 +1,10 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import {
-  Heart,
   Target,
   Eye,
   AlertTriangle,
   CheckCircle,
-  Users,
   Building2,
   ShieldCheck,
   Lock,

@@ -14,7 +14,7 @@ export const Select = React.forwardRef(({
   children,
   ...props
 }, ref) => {
-  const selectId = id || (label ? label.toLowerCase().replace(/\s+/g, '-') : undefined);
+  const selectId = id || (label ? label.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') : undefined);
 
   return (
     <div className="w-full">

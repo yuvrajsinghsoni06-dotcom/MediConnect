@@ -1,56 +1,79 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
-  Calendar,
   Search,
   MapPin,
-  Building,
   Heart,
   SlidersHorizontal,
   RotateCcw,
   PlusCircle
 } from 'lucide-react';
-import { SectionHeading } from '../../components/ui/SectionHeading';
 import { Input } from '../../components/ui/Input';
 import { Select } from '../../components/ui/Select';
 import { Button } from '../../components/ui/Button';
 import { CampaignCard } from '../../components/common/CampaignCard';
 import { EmptyState } from '../../components/ui/EmptyState';
+import { ErrorState } from '../../components/ui/ErrorState';
 import { LoadingSpinner } from '../../components/ui/LoadingSpinner';
 import { Modal } from '../../components/ui/Modal';
 import { campaignService } from '../../services/campaignService';
 import { MAJOR_CITIES } from '../../utils/constants';
+import { useDebounce } from '../../hooks/useDebounce';
 
 export const CampaignsPage = () => {
   const [campaigns, setCampaigns] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCity, setSelectedCity] = useState('All Cities');
   const [isSuggestModalOpen, setIsSuggestModalOpen] = useState(false);
   const [suggestSuccess, setSuggestSuccess] = useState(false);
+  const [retryCount, setRetryCount] = useState(0);
+
+  const debouncedSearchQuery = useDebounce(searchQuery, 300);
 
   useEffect(() => {
+    const controller = new AbortController();
+
+    const fetchCampaigns = async () => {
+      setIsLoading(true);
+      setError(null);
+      try {
+        const response = await campaignService.getCampaigns(
+          {
+            city: selectedCity,
+            search: debouncedSearchQuery,
+          },
+          { signal: controller.signal }
+        );
+        setCampaigns(response.data);
+      } catch (err) {
+        if (err.name === 'AbortError' || err.code === 'ERR_CANCELED') {
+          return;
+        }
+        console.error('Error fetching campaigns:', err);
+        setError(err?.message || 'Failed to load community donation campaigns. Please try again.');
+      } finally {
+        if (!controller.signal.aborted) {
+          setIsLoading(false);
+        }
+      }
+    };
+
     fetchCampaigns();
-  }, [searchQuery, selectedCity]);
 
-  const fetchCampaigns = async () => {
-    setIsLoading(true);
-    try {
-      const response = await campaignService.getCampaigns({
-        city: selectedCity,
-        search: searchQuery,
-      });
-      setCampaigns(response.data);
-    } catch (err) {
-      console.error('Error fetching campaigns:', err);
-    } finally {
-      setIsLoading(false);
-    }
-  };
+    return () => {
+      controller.abort();
+    };
+  }, [debouncedSearchQuery, selectedCity, retryCount]);
 
-  const handleResetFilters = () => {
+  const handleResetFilters = useCallback(() => {
     setSearchQuery('');
     setSelectedCity('All Cities');
-  };
+  }, []);
+
+  const handleRetry = useCallback(() => {
+    setRetryCount((c) => c + 1);
+  }, []);
 
   return (
     <div className="w-full py-10 sm:py-16">
@@ -106,6 +129,7 @@ export const CampaignsPage = () => {
                 icon={Search}
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
+                aria-label="Search campaigns"
               />
             </div>
             <div>
@@ -113,6 +137,7 @@ export const CampaignsPage = () => {
                 value={selectedCity}
                 onChange={(e) => setSelectedCity(e.target.value)}
                 icon={MapPin}
+                aria-label="Filter by City"
               >
                 {MAJOR_CITIES.map((c) => (
                   <option key={c} value={c}>{c}</option>
@@ -123,18 +148,26 @@ export const CampaignsPage = () => {
         </div>
 
         {/* Campaigns Count */}
-        <div className="flex items-center justify-between text-xs text-[#64748B]">
-          <span>
-            Showing <strong className="text-[#0F172A] font-bold">{campaigns.length}</strong> upcoming donation drives
-          </span>
-          <span className="text-[11px] text-slate-400">
-            Illustrative sample donation camps
-          </span>
-        </div>
+        {!error && !isLoading && (
+          <div className="flex items-center justify-between text-xs text-[#64748B]">
+            <span>
+              Showing <strong className="text-[#0F172A] font-bold">{campaigns.length}</strong> upcoming donation drives
+            </span>
+            <span className="text-[11px] text-slate-400">
+              Illustrative sample donation camps
+            </span>
+          </div>
+        )}
 
         {/* Campaigns Grid */}
         {isLoading ? (
           <LoadingSpinner message="Loading upcoming healthcare campaigns..." size="lg" />
+        ) : error ? (
+          <ErrorState
+            title="Failed to Load Campaigns"
+            message={error}
+            onRetry={handleRetry}
+          />
         ) : campaigns.length === 0 ? (
           <EmptyState
             title="No campaigns match your filters"

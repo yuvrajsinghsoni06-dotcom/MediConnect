@@ -7,12 +7,18 @@ import { mockDonors } from '../data/donorsData';
  */
 export const donorService = {
   /**
-   * Fetch donors with optional filtering
+   * Fetch donors with optional filtering and abort signal support
    */
-  async getDonors(filters = {}) {
-    // Simulate slight asynchronous query resolution
-    return new Promise((resolve) => {
-      setTimeout(() => {
+  async getDonors(filters = {}, options = {}) {
+    const { signal } = options;
+
+    // Simulate asynchronous query resolution with abort handling
+    return new Promise((resolve, reject) => {
+      const timer = setTimeout(() => {
+        if (signal?.aborted) {
+          return reject(new DOMException('Request aborted', 'AbortError'));
+        }
+
         let results = [...mockDonors];
 
         if (filters.bloodGroup && filters.bloodGroup !== 'all') {
@@ -47,6 +53,13 @@ export const donorService = {
           status: 'success',
         });
       }, 150);
+
+      if (signal) {
+        signal.addEventListener('abort', () => {
+          clearTimeout(timer);
+          reject(new DOMException('Request aborted', 'AbortError'));
+        });
+      }
     });
   },
 

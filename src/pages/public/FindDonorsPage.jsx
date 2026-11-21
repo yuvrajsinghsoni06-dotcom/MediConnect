@@ -1,29 +1,27 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import {
   Search,
-  Filter,
   MapPin,
   RotateCcw,
-  Users,
-  ShieldCheck,
   Droplet,
   SlidersHorizontal,
   Compass
 } from 'lucide-react';
-import { SectionHeading } from '../../components/ui/SectionHeading';
 import { Input } from '../../components/ui/Input';
 import { Select } from '../../components/ui/Select';
-import { Button } from '../../components/ui/Button';
 import { DonorCard } from '../../components/common/DonorCard';
 import { EmergencyNoticeBanner } from '../../components/common/EmergencyNoticeBanner';
 import { EmptyState } from '../../components/ui/EmptyState';
+import { ErrorState } from '../../components/ui/ErrorState';
 import { LoadingSpinner } from '../../components/ui/LoadingSpinner';
 import { donorService } from '../../services/donorService';
 import { BLOOD_GROUPS, MAJOR_CITIES, AVAILABILITY_OPTIONS } from '../../utils/constants';
+import { useDebounce } from '../../hooks/useDebounce';
 
 export const FindDonorsPage = () => {
   const [donors, setDonors] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   // Search & Filter state
   const [searchQuery, setSearchQuery] = useState('');
@@ -31,36 +29,72 @@ export const FindDonorsPage = () => {
   const [selectedCity, setSelectedCity] = useState('All Cities');
   const [selectedAvailability, setSelectedAvailability] = useState('all');
   const [maxDistance, setMaxDistance] = useState('10'); // in km
+  const [retryCount, setRetryCount] = useState(0);
+
+  // Debounce search input (300ms) to prevent excessive query calls
+  const debouncedSearchQuery = useDebounce(searchQuery, 300);
 
   useEffect(() => {
+    const controller = new AbortController();
+
+    const fetchDonors = async () => {
+      setIsLoading(true);
+      setError(null);
+
+      try {
+        const response = await donorService.getDonors(
+          {
+            bloodGroup: selectedBloodGroup,
+            city: selectedCity,
+            availability: selectedAvailability,
+            maxDistance: maxDistance ? Number(maxDistance) : undefined,
+            search: debouncedSearchQuery,
+          },
+          { signal: controller.signal }
+        );
+
+        setDonors(response.data);
+      } catch (err) {
+        // If aborted by a newer request or cleanup, don't update state
+        if (err.name === 'AbortError' || err.code === 'ERR_CANCELED') {
+          return;
+        }
+        console.error('Error fetching donors:', err);
+        setError(
+          err?.message || 'Failed to retrieve donor records. Please check your network connection and try again.'
+        );
+      } finally {
+        if (!controller.signal.aborted) {
+          setIsLoading(false);
+        }
+      }
+    };
+
     fetchDonors();
-  }, [selectedBloodGroup, selectedCity, selectedAvailability, maxDistance, searchQuery]);
 
-  const fetchDonors = async () => {
-    setIsLoading(true);
-    try {
-      const response = await donorService.getDonors({
-        bloodGroup: selectedBloodGroup,
-        city: selectedCity,
-        availability: selectedAvailability,
-        maxDistance: maxDistance ? Number(maxDistance) : undefined,
-        search: searchQuery,
-      });
-      setDonors(response.data);
-    } catch (err) {
-      console.error('Error fetching donors:', err);
-    } finally {
-      setIsLoading(false);
-    }
-  };
+    return () => {
+      controller.abort();
+    };
+  }, [
+    selectedBloodGroup,
+    selectedCity,
+    selectedAvailability,
+    maxDistance,
+    debouncedSearchQuery,
+    retryCount,
+  ]);
 
-  const handleResetFilters = () => {
+  const handleResetFilters = useCallback(() => {
     setSearchQuery('');
     setSelectedBloodGroup('all');
     setSelectedCity('All Cities');
     setSelectedAvailability('all');
     setMaxDistance('10');
-  };
+  }, []);
+
+  const handleRetry = useCallback(() => {
+    setRetryCount((c) => c + 1);
+  }, []);
 
   const activeFiltersCount = useMemo(() => {
     let count = 0;
@@ -125,6 +159,7 @@ export const FindDonorsPage = () => {
                 icon={Search}
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
+                aria-label="Search by donor name, area, or city"
               />
             </div>
 
@@ -134,6 +169,7 @@ export const FindDonorsPage = () => {
                 value={selectedBloodGroup}
                 onChange={(e) => setSelectedBloodGroup(e.target.value)}
                 icon={Droplet}
+                aria-label="Filter by Blood Group"
               >
                 <option value="all">All Blood Groups</option>
                 {BLOOD_GROUPS.map((bg) => (
@@ -150,6 +186,7 @@ export const FindDonorsPage = () => {
                 value={selectedCity}
                 onChange={(e) => setSelectedCity(e.target.value)}
                 icon={MapPin}
+                aria-label="Filter by City"
               >
                 {MAJOR_CITIES.map((c) => (
                   <option key={c} value={c}>
@@ -164,6 +201,7 @@ export const FindDonorsPage = () => {
               <Select
                 value={selectedAvailability}
                 onChange={(e) => setSelectedAvailability(e.target.value)}
+                aria-label="Filter by Availability"
               >
                 {AVAILABILITY_OPTIONS.map((opt) => (
                   <option key={opt.value} value={opt.value}>
@@ -193,25 +231,34 @@ export const FindDonorsPage = () => {
                 value={maxDistance}
                 onChange={(e) => setMaxDistance(e.target.value)}
                 className="w-40 accent-[#DC2626] cursor-pointer"
+                aria-label="Approximate search radius in kilometers"
               />
               <span className="text-[11px] font-bold text-slate-700 w-10 text-right">{maxDistance} km</span>
             </div>
           </div>
         </div>
 
-        {/* Results Count & Quick Bar */}
-        <div className="flex items-center justify-between text-xs text-[#64748B]">
-          <div>
-            Showing <strong className="text-[#0F172A] font-bold">{donors.length}</strong> volunteer donor matches
+        {/* Results Count & Quick Bar (Only shown when not loading and no error) */}
+        {!error && !isLoading && (
+          <div className="flex items-center justify-between text-xs text-[#64748B]">
+            <div>
+              Showing <strong className="text-[#0F172A] font-bold">{donors.length}</strong> volunteer donor matches
+            </div>
+            <div className="text-[11px] text-slate-400">
+              Sample mock database • No sensitive donor credentials exposed
+            </div>
           </div>
-          <div className="text-[11px] text-slate-400">
-            Sample mock database • No sensitive donor credentials exposed
-          </div>
-        </div>
+        )}
 
-        {/* Donors Grid */}
+        {/* Donors Grid / Loading / Error / Empty States */}
         {isLoading ? (
           <LoadingSpinner message="Searching verified donor pool..." size="lg" />
+        ) : error ? (
+          <ErrorState
+            title="Failed to Load Donors"
+            message={error}
+            onRetry={handleRetry}
+          />
         ) : donors.length === 0 ? (
           <EmptyState
             title="No matching donors found"

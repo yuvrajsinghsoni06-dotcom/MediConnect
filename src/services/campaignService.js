@@ -5,9 +5,15 @@ import { mockCampaigns } from '../data/campaignsData';
  * Provides donation drive and campaign event queries.
  */
 export const campaignService = {
-  async getCampaigns(filters = {}) {
-    return new Promise((resolve) => {
-      setTimeout(() => {
+  async getCampaigns(filters = {}, options = {}) {
+    const { signal } = options;
+
+    return new Promise((resolve, reject) => {
+      const timer = setTimeout(() => {
+        if (signal?.aborted) {
+          return reject(new DOMException('Request aborted', 'AbortError'));
+        }
+
         let results = [...mockCampaigns];
 
         if (filters.city && filters.city !== 'All Cities') {
@@ -34,6 +40,13 @@ export const campaignService = {
           status: 'success',
         });
       }, 150);
+
+      if (signal) {
+        signal.addEventListener('abort', () => {
+          clearTimeout(timer);
+          reject(new DOMException('Request aborted', 'AbortError'));
+        });
+      }
     });
   },
 

@@ -6,10 +6,8 @@ import {
   Mail,
   Phone,
   MapPin,
-  Clock,
   Send,
   CheckCircle2,
-  HelpCircle,
   ChevronDown,
   ChevronUp,
   AlertCircle
@@ -199,10 +197,12 @@ export const ContactPage = () => {
 
                   <FormField
                     label="Your Message"
+                    id="contact-message"
                     required
                     error={errors.message?.message}
                   >
                     <textarea
+                      id="contact-message"
                       rows={5}
                       placeholder="Explain your inquiry, suggestion, or question in detail..."
                       className={`block w-full rounded-lg border text-sm text-[#0F172A] p-3.5 transition-colors focus:outline-none focus:ring-2 focus:ring-[#DC2626]/20 ${

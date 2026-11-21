@@ -9,10 +9,7 @@ import {
   EyeOff,
   Mail,
   Lock,
-  ArrowRight,
-  ShieldCheck,
-  CheckCircle2,
-  AlertCircle
+  CheckCircle2
 } from 'lucide-react';
 import { Card } from '../../components/ui/Card';
 import { Input } from '../../components/ui/Input';
@@ -113,7 +110,7 @@ export const LoginPage = () => {
 
               <div className="w-full">
                 <div className="flex items-center justify-between mb-1.5">
-                  <label className="block text-sm font-semibold text-[#0F172A]">
+                  <label htmlFor="login-password" className="block text-sm font-semibold text-[#0F172A]">
                     Password <span className="text-[#DC2626]">*</span>
                   </label>
                   <Link
@@ -128,6 +125,7 @@ export const LoginPage = () => {
                     <Lock className="w-4 h-4" />
                   </div>
                   <input
+                    id="login-password"
                     type={showPassword ? 'text' : 'password'}
                     placeholder="Enter password"
                     className={`block w-full rounded-lg border text-sm text-[#0F172A] pl-10 pr-10 py-2.5 transition-colors focus:outline-none focus:ring-2 focus:ring-[#DC2626]/20 ${

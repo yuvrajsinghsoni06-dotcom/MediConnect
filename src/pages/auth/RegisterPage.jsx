@@ -12,10 +12,7 @@ import {
   Lock,
   Phone,
   MapPin,
-  ShieldCheck,
-  CheckCircle2,
-  Users,
-  AlertCircle
+  CheckCircle2
 } from 'lucide-react';
 import { Card } from '../../components/ui/Card';
 import { Input } from '../../components/ui/Input';
@@ -227,7 +224,7 @@ export const RegisterPage = () => {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
                 {/* Password */}
                 <div>
-                  <label className="block text-sm font-semibold text-[#0F172A] mb-1.5">
+                  <label htmlFor="register-password" className="block text-sm font-semibold text-[#0F172A] mb-1.5">
                     Password <span className="text-[#DC2626]">*</span>
                   </label>
                   <div className="relative rounded-lg shadow-sm">
@@ -235,6 +232,7 @@ export const RegisterPage = () => {
                       <Lock className="w-4 h-4" />
                     </div>
                     <input
+                      id="register-password"
                       type={showPassword ? 'text' : 'password'}
                       placeholder="At least 8 chars"
                       className={`block w-full rounded-lg border text-sm text-[#0F172A] pl-10 pr-10 py-2.5 transition-colors focus:outline-none focus:ring-2 focus:ring-[#DC2626]/20 ${
@@ -248,6 +246,7 @@ export const RegisterPage = () => {
                       type="button"
                       onClick={() => setShowPassword(!showPassword)}
                       className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-slate-400 hover:text-slate-600 focus:outline-none"
+                      aria-label={showPassword ? 'Hide password' : 'Show password'}
                     >
                       {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                     </button>
@@ -261,7 +260,7 @@ export const RegisterPage = () => {
 
                 {/* Confirm Password */}
                 <div>
-                  <label className="block text-sm font-semibold text-[#0F172A] mb-1.5">
+                  <label htmlFor="register-confirm-password" className="block text-sm font-semibold text-[#0F172A] mb-1.5">
                     Confirm Password <span className="text-[#DC2626]">*</span>
                   </label>
                   <div className="relative rounded-lg shadow-sm">
@@ -269,6 +268,7 @@ export const RegisterPage = () => {
                       <Lock className="w-4 h-4" />
                     </div>
                     <input
+                      id="register-confirm-password"
                       type={showConfirmPassword ? 'text' : 'password'}
                       placeholder="Repeat password"
                       className={`block w-full rounded-lg border text-sm text-[#0F172A] pl-10 pr-10 py-2.5 transition-colors focus:outline-none focus:ring-2 focus:ring-[#DC2626]/20 ${
@@ -282,6 +282,7 @@ export const RegisterPage = () => {
                       type="button"
                       onClick={() => setShowConfirmPassword(!showConfirmPassword)}
                       className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-slate-400 hover:text-slate-600 focus:outline-none"
+                      aria-label={showConfirmPassword ? 'Hide password' : 'Show password'}
                     >
                       {showConfirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                     </button>
