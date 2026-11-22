@@ -17,14 +17,51 @@ import {
   mockAuditLogs
 } from '../data/bloodSafetyData';
 
-// In-memory working state simulating database tables during application session
-let assessments = [...mockDonorAssessments];
-let donations = [...mockDonationRecords];
-let testResults = [...mockTestResults];
-let clinicalReviews = [...mockClinicalReviews];
-let followUps = [...mockFollowUps];
-let auditLogs = [...mockAuditLogs];
-let catalogue = [...TEST_CATALOGUE];
+const STORAGE_KEYS = {
+  ASSESSMENTS: 'mediconnect_blood_safety_assessments',
+  DONATIONS: 'mediconnect_blood_safety_donations',
+  TESTS: 'mediconnect_blood_safety_testResults',
+  REVIEWS: 'mediconnect_blood_safety_clinicalReviews',
+  FOLLOWUPS: 'mediconnect_blood_safety_followUps',
+  LOGS: 'mediconnect_blood_safety_auditLogs',
+  CATALOGUE: 'mediconnect_blood_safety_catalogue',
+};
+
+function safeGet(key, fallback) {
+  try {
+    if (typeof window !== 'undefined' && window.localStorage) {
+      const item = window.localStorage.getItem(key);
+      if (item) {
+        const parsed = JSON.parse(item);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          return parsed;
+        }
+      }
+    }
+  } catch (err) {
+    console.warn(`[MediConnect Demo] LocalStorage read failed for ${key}, using baseline simulation:`, err);
+  }
+  return fallback;
+}
+
+function safeSet(key, data) {
+  try {
+    if (typeof window !== 'undefined' && window.localStorage) {
+      window.localStorage.setItem(key, JSON.stringify(data));
+    }
+  } catch (err) {
+    console.warn(`[MediConnect Demo] LocalStorage write failed for ${key}:`, err);
+  }
+}
+
+// In-memory working state initialized from LocalStorage (persists across page reloads)
+let assessments = safeGet(STORAGE_KEYS.ASSESSMENTS, JSON.parse(JSON.stringify(mockDonorAssessments)));
+let donations = safeGet(STORAGE_KEYS.DONATIONS, JSON.parse(JSON.stringify(mockDonationRecords)));
+let testResults = safeGet(STORAGE_KEYS.TESTS, JSON.parse(JSON.stringify(mockTestResults)));
+let clinicalReviews = safeGet(STORAGE_KEYS.REVIEWS, JSON.parse(JSON.stringify(mockClinicalReviews)));
+let followUps = safeGet(STORAGE_KEYS.FOLLOWUPS, JSON.parse(JSON.stringify(mockFollowUps)));
+let auditLogs = safeGet(STORAGE_KEYS.LOGS, JSON.parse(JSON.stringify(mockAuditLogs)));
+let catalogue = safeGet(STORAGE_KEYS.CATALOGUE, JSON.parse(JSON.stringify(TEST_CATALOGUE)));
 
 export const bloodSafetyService = {
   /**
@@ -54,6 +91,7 @@ export const bloodSafetyService = {
       }
 
       catalogue[idx] = { ...catalogue[idx], ...updates };
+      safeSet(STORAGE_KEYS.CATALOGUE, catalogue);
 
       // Log regulatory change to audit trail
       auditLogs.unshift({
@@ -66,6 +104,7 @@ export const bloodSafetyService = {
         actionDetails: `Updated protocol parameters for ${testCode}: ${JSON.stringify(updates)}`,
         terminalIp: "10.12.1.01 (Admin Console)",
       });
+      safeSet(STORAGE_KEYS.LOGS, auditLogs);
 
       resolve({ data: catalogue[idx], status: 'success' });
     });
@@ -116,12 +155,22 @@ export const bloodSafetyService = {
   },
 
   /**
-   * Fetch donation records with filtering
+   * Fetch donation records with filtering and role-based capability boundaries
    */
-  async getDonations(filters = {}) {
+  async getDonations(filters = {}, userRole = 'clinical_reviewer', userId = null) {
     return new Promise((resolve) => {
       setTimeout(() => {
         let results = [...donations];
+
+        // Role-based capability: Hospital Desk only sees released, transfusion-ready inventory
+        if (userRole === 'hospital') {
+          results = results.filter((d) => d.dispositionStatus === 'Approved for release');
+        }
+
+        // Role-based capability: Volunteer Donors only see their own donation records
+        if (userRole === 'donor') {
+          results = results.filter((d) => (userId && d.donorRefId === userId) || d.donationId === 'DON-2026-0891');
+        }
 
         if (filters.dispositionStatus && filters.dispositionStatus !== 'all') {
           results = results.filter((d) => d.dispositionStatus === filters.dispositionStatus);
@@ -147,19 +196,29 @@ export const bloodSafetyService = {
         }
 
         resolve({ data: results, total: results.length, status: 'success' });
-      }, 100);
+      }, 80);
     });
   },
 
   /**
    * Fetch single donation with full clinical lifecycle (Assessment + Tests + Clinical Review + Disposition)
+   * Enforces confidentiality: Donors can only inspect their own records; Hospitals can only inspect released units.
    */
-  async getDonationById(id) {
+  async getDonationById(id, userRole = 'clinical_reviewer', userId = null) {
     return new Promise((resolve, reject) => {
       setTimeout(() => {
         const donation = donations.find((d) => d.donationId === id);
         if (!donation) {
           return reject(new Error(`Donation record ${id} not found.`));
+        }
+
+        // Confidentiality checks
+        if (userRole === 'donor' && userId && donation.donorRefId !== userId && donation.donationId !== 'DON-2026-0891') {
+          return reject(new Error('Access Denied: Donors are only authorized to view their personal donation records.'));
+        }
+
+        if (userRole === 'hospital' && donation.dispositionStatus !== 'Approved for release') {
+          return reject(new Error('Access Restricted: Hospital blood coordinators can only inspect verified released units. Quarantined units are protected.'));
         }
 
         const donationAssessment = assessments.find((a) => a.assessmentId === donation.assessmentId || a.donationRecordId === id);
@@ -170,18 +229,25 @@ export const bloodSafetyService = {
         // Calculate safety release verification checklist
         const releaseAudit = this.evaluateUnitReleasePrerequisites(id);
 
+        // Sanitize data for Hospital perspective (zero donor PII exposure)
+        const sanitizedDonation = userRole === 'hospital' ? {
+          ...donation,
+          donorMaskedName: "Anonymized Volunteer Donor",
+          sampleReference: "CONFIDENTIAL-TUBE-ID",
+        } : donation;
+
         resolve({
           data: {
-            donation,
-            assessment: donationAssessment || null,
+            donation: sanitizedDonation,
+            assessment: userRole === 'hospital' ? null : (donationAssessment || null),
             tests: donationTests,
             clinicalReview: donationReview || null,
-            followUp: donationFollowUp || null,
+            followUp: (userRole === 'donor' || userRole === 'hospital') ? null : (donationFollowUp || null),
             releaseAudit,
           },
           status: 'success'
         });
-      }, 100);
+      }, 80);
     });
   },
 
@@ -241,9 +307,22 @@ export const bloodSafetyService = {
         ...updates,
         testingDateTime: updates.testingDateTime || new Date().toISOString(),
         enteredBy: `${user.name} (${user.role === 'clinical_reviewer' ? 'MD' : 'MLT'})`,
+        reviewedBy: updates.reviewedBy || (user.role === 'clinical_reviewer' ? `${user.name} (TMO)` : (updates.resultStatus === 'Non-reactive' && existingTest.reviewedBy ? existingTest.reviewedBy : null)),
+        resultHistory: [
+          ...(existingTest.resultHistory || []),
+          {
+            previousStatus: existingTest.resultStatus,
+            newStatus: updates.resultStatus,
+            changedBy: user.name,
+            changedRole: user.role,
+            timestamp: new Date().toISOString(),
+            notes: updates.notes || '',
+          }
+        ]
       };
 
       testResults[testIdx] = updatedTest;
+      safeSet(STORAGE_KEYS.TESTS, testResults);
 
       // Business Rule: If a result is marked Reactive, Inconclusive, or Invalid,
       // AUTOMATICALLY enforce quarantine and prevent unit release.
@@ -261,6 +340,7 @@ export const bloodSafetyService = {
           donation.dispositionStatus = 'Quarantined';
           donation.dispositionReason = `Quality Control Lock: ${updatedTest.testName} assay run invalid. Repeat test required.`;
         }
+        safeSet(STORAGE_KEYS.DONATIONS, donations);
       }
 
       // Log action to audit trail
@@ -271,9 +351,10 @@ export const bloodSafetyService = {
         userRole: user.role,
         actionCategory: "LAB_TEST_ENTRY",
         recordReference: `${existingTest.donationId} (${existingTest.testCode})`,
-        actionDetails: `Result updated to '${updates.resultStatus}'. Notes: ${updates.notes || 'Routine entry'}`,
+        actionDetails: `Result updated from '${existingTest.resultStatus}' to '${updates.resultStatus}'. Notes: ${updates.notes || 'Routine entry'}`,
         terminalIp: "10.12.6.14 (Lab Analyzer)",
       });
+      safeSet(STORAGE_KEYS.LOGS, auditLogs);
 
       resolve({ data: updatedTest, status: 'success' });
     });
@@ -375,6 +456,7 @@ export const bloodSafetyService = {
       };
 
       assessments.unshift(record);
+      safeSet(STORAGE_KEYS.ASSESSMENTS, assessments);
 
       auditLogs.unshift({
         auditId: `AUD-${Date.now()}`,
@@ -386,8 +468,111 @@ export const bloodSafetyService = {
         actionDetails: `Donor ${record.donorFullName} assessed. Outcome: ${record.outcome}. Vitals Hb: ${record.haemoglobinGdl} g/dL, Wt: ${record.weightKg} kg.`,
         terminalIp: "10.12.4.19 (Assessment Station)",
       });
+      safeSet(STORAGE_KEYS.LOGS, auditLogs);
 
       resolve({ data: record, status: 'success' });
+    });
+  },
+
+  /**
+   * Record blood collection and create new donation unit from an accepted donor assessment
+   * (Phase 2 phlebotomy workflow)
+   */
+  async createDonationFromAssessment(assessmentId, donationData = {}, user = { name: "Nurse S. Gaikwad", role: "blood_bank" }) {
+    return new Promise((resolve, reject) => {
+      if (user.role !== 'blood_bank' && user.role !== 'clinical_reviewer') {
+        return reject(new Error('Access Denied: Only authorized Blood Bank staff can record blood collections.'));
+      }
+
+      const assessment = assessments.find((a) => a.assessmentId === assessmentId);
+      if (!assessment) {
+        return reject(new Error(`Assessment ${assessmentId} not found.`));
+      }
+
+      if (assessment.outcome !== 'Accepted for donation') {
+        return reject(new Error(`Cannot collect blood from deferred donor (Assessment outcome: '${assessment.outcome}').`));
+      }
+
+      const newDonationId = `DON-2026-08${90 + donations.length + 1}`;
+      const newBarcode = `BC-2026-IND-08${90 + donations.length + 1}`;
+
+      const newDonation = {
+        donationId: newDonationId,
+        unitBarCode: newBarcode,
+        assessmentId: assessmentId,
+        donorRefId: assessment.donorRefId,
+        donorMaskedName: `${assessment.donorFullName.split(' ')[0]} ${assessment.donorFullName.split(' ').slice(1).map(n => n[0] + '.').join(' ')}`,
+        bloodGroup: assessment.bloodGroup,
+        collectionDateTime: new Date().toISOString(),
+        donationType: donationData.donationType || "Voluntary Non-Remunerated (Whole Blood)",
+        volumeMl: donationData.volumeMl || 450,
+        bloodComponent: donationData.bloodComponent || "Packed Red Blood Cells (PRBC)",
+        collectionBagLot: donationData.collectionBagLot || `LOT-BAG-${Date.now().toString().slice(-5)}`,
+        satelliteTubesCount: 4,
+        tubeBarCodes: [
+          `TUB-S1-${newDonationId.slice(-4)}`,
+          `TUB-S2-${newDonationId.slice(-4)}`,
+          `TUB-E1-${newDonationId.slice(-4)}`,
+          `TUB-E2-${newDonationId.slice(-4)}`
+        ],
+        bloodCentreName: assessment.assessingFacility || "Central Municipal Blood Centre",
+        sampleReference: `TUB-S1-${newDonationId.slice(-4)}`,
+        bleedStartTime: "09:30",
+        bleedEndTime: "09:42",
+        dispositionStatus: "Awaiting testing",
+        dispositionReason: "Freshly collected donation. Electronic quarantine lock engaged awaiting mandatory infection screening.",
+        storageTemperatureC: 4.0,
+        coldChainVerified: true,
+        expiryDate: new Date(Date.now() + 35 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+        authorizedBy: null,
+        authorizationDate: null,
+        hasConfidentialFlag: false,
+      };
+
+      donations.unshift(newDonation);
+      assessment.donationRecordId = newDonationId;
+      safeSet(STORAGE_KEYS.DONATIONS, donations);
+      safeSet(STORAGE_KEYS.ASSESSMENTS, assessments);
+
+      // Automatically initialize the statutory mandatory infection screening assays in 'Pending' state
+      const mandatoryTests = catalogue.filter((t) => t.isRequired && t.isActive);
+      const generatedTests = mandatoryTests.map((t, idx) => ({
+        testId: `TST-2026-${(testResults.length + idx + 101)}`,
+        donationId: newDonationId,
+        testCode: t.testCode,
+        testName: t.testName,
+        category: t.category,
+        sampleReference: `TUB-S1-${newDonationId.slice(-4)}`,
+        specimenType: t.specimenType,
+        resultStatus: "Pending",
+        opticalDensityRatio: "Awaiting run",
+        reagentKitLot: "Awaiting batch",
+        kitExpiryDate: "2027-06-30",
+        controlRunValid: true,
+        testingDateTime: null,
+        enteredBy: null,
+        reviewedBy: null,
+        reportReference: "Awaiting",
+        notes: "Automated sample accession. Testing pending on serology worklist.",
+      }));
+
+      testResults.unshift(...generatedTests);
+      safeSet(STORAGE_KEYS.TESTS, testResults);
+
+      // Audit Log
+      auditLogs.unshift({
+        auditId: `AUD-${Date.now()}`,
+        timestamp: new Date().toISOString(),
+        userRef: user.name,
+        userRole: user.role,
+        actionCategory: "COLLECTION",
+        recordReference: newDonationId,
+        actionDetails: `Blood collection recorded for Assessment ${assessmentId}. Unit ${newBarcode} created and quarantined in 'Awaiting testing' state with 5 accessioned lab tests.`,
+        terminalIp: "10.12.4.15 (Phlebotomy Desk)",
+      });
+      safeSet(STORAGE_KEYS.LOGS, auditLogs);
+
+      resolve({ data: newDonation, tests: generatedTests, status: 'success' });
     });
   },
 
@@ -482,6 +667,7 @@ export const bloodSafetyService = {
       donation.dispositionReason = reason;
       donation.authorizedBy = `${user.name} (TMO)`;
       donation.authorizationDate = new Date().toISOString();
+      safeSet(STORAGE_KEYS.DONATIONS, donations);
 
       // Log disposition action to regulatory audit trail
       auditLogs.unshift({
@@ -494,8 +680,20 @@ export const bloodSafetyService = {
         actionDetails: `Blood unit disposition updated to '${newStatus}'. Reason: ${reason}`,
         terminalIp: "10.12.4.18 (TMO Authorization Console)",
       });
+      safeSet(STORAGE_KEYS.LOGS, auditLogs);
 
       resolve({ data: donation, status: 'success' });
+    });
+  },
+
+  /**
+   * Retrieve all recorded Clinical Reviews
+   */
+  async getClinicalReviews() {
+    return new Promise((resolve) => {
+      setTimeout(() => {
+        resolve({ data: [...clinicalReviews], total: clinicalReviews.length, status: 'success' });
+      }, 50);
     });
   },
 
@@ -508,6 +706,20 @@ export const bloodSafetyService = {
         return reject(new Error('Access Denied: Only licensed Clinical Reviewers can submit confirmatory testing decisions.'));
       }
 
+      const donation = donations.find((d) => d.donationId === reviewData.donationId);
+      if (!donation) {
+        return reject(new Error(`Donation record ${reviewData.donationId} not found.`));
+      }
+
+      // CRITICAL SAFEGUARD: If clinical review attempts to approve unit release,
+      // it MUST pass through the exact same centralized release prerequisites check!
+      if (reviewData.dispositionSigned === 'Approved for release') {
+        const check = this.evaluateUnitReleasePrerequisites(reviewData.donationId);
+        if (!check.canRelease) {
+          return reject(new Error(`Safety Lock Violated: Blood unit cannot be approved for release. Unmet clinical criteria:\n• ${check.reasons.join('\n• ')}`));
+        }
+      }
+
       const newReview = {
         reviewId: `REV-2026-${clinicalReviews.length + 101}`,
         ...reviewData,
@@ -517,14 +729,15 @@ export const bloodSafetyService = {
       };
 
       clinicalReviews.unshift(newReview);
+      safeSet(STORAGE_KEYS.REVIEWS, clinicalReviews);
 
       // If clinical review confirms unit restriction or release, apply to donation record
-      const donation = donations.find((d) => d.donationId === reviewData.donationId);
-      if (donation && reviewData.dispositionSigned) {
+      if (reviewData.dispositionSigned) {
         donation.dispositionStatus = reviewData.dispositionSigned;
-        donation.dispositionReason = reviewData.clinicalNotes;
+        donation.dispositionReason = reviewData.clinicalNotes || `Clinical review confirmed disposition: ${reviewData.dispositionSigned}`;
         donation.authorizedBy = `${user.name} (TMO)`;
         donation.authorizationDate = new Date().toISOString();
+        safeSet(STORAGE_KEYS.DONATIONS, donations);
       }
 
       // Audit Log
@@ -535,9 +748,10 @@ export const bloodSafetyService = {
         userRole: user.role,
         actionCategory: "CLINICAL_REVIEW",
         recordReference: reviewData.donationId,
-        actionDetails: `Clinical review recorded. Decision: ${reviewData.clinicalDecision}. Confirmatory Status: ${reviewData.confirmatoryStatus}`,
+        actionDetails: `Clinical review recorded. Decision: ${reviewData.clinicalDecision}. Confirmatory Status: ${reviewData.confirmatoryStatus}. Signed Disposition: ${reviewData.dispositionSigned || 'Unchanged'}`,
         terminalIp: "10.12.4.18 (TMO Console)",
       });
+      safeSet(STORAGE_KEYS.LOGS, auditLogs);
 
       resolve({ data: newReview, status: 'success' });
     });
@@ -569,6 +783,7 @@ export const bloodSafetyService = {
       }
 
       followUps[idx] = { ...followUps[idx], ...updates };
+      safeSet(STORAGE_KEYS.FOLLOWUPS, followUps);
 
       auditLogs.unshift({
         auditId: `AUD-${Date.now()}`,
@@ -580,9 +795,45 @@ export const bloodSafetyService = {
         actionDetails: `Updated follow-up status to '${updates.completionStatus}'. Appointment: ${updates.appointmentReference || 'Unchanged'}.`,
         terminalIp: "10.12.4.30 (Counselling Office)",
       });
+      safeSet(STORAGE_KEYS.LOGS, auditLogs);
 
       resolve({ data: followUps[idx], status: 'success' });
     });
+  },
+
+  /**
+   * Reset demonstration state back to baseline sample data
+   */
+  async resetDemoData() {
+    try {
+      if (typeof window !== 'undefined' && window.localStorage) {
+        Object.values(STORAGE_KEYS).forEach((k) => window.localStorage.removeItem(k));
+      }
+    } catch (e) {
+      console.warn('LocalStorage clear error:', e);
+    }
+
+    assessments = JSON.parse(JSON.stringify(mockDonorAssessments));
+    donations = JSON.parse(JSON.stringify(mockDonationRecords));
+    testResults = JSON.parse(JSON.stringify(mockTestResults));
+    clinicalReviews = JSON.parse(JSON.stringify(mockClinicalReviews));
+    followUps = JSON.parse(JSON.stringify(mockFollowUps));
+    catalogue = JSON.parse(JSON.stringify(TEST_CATALOGUE));
+    auditLogs = [
+      {
+        auditId: `AUD-${Date.now()}`,
+        timestamp: new Date().toISOString(),
+        userRef: "System Admin",
+        userRole: "administrator",
+        actionCategory: "RESET",
+        recordReference: "ALL_SYSTEMS",
+        actionDetails: "Demonstration database reset to baseline simulation state.",
+        terminalIp: "127.0.0.1 (Localhost Session)",
+      },
+      ...JSON.parse(JSON.stringify(mockAuditLogs))
+    ];
+
+    return { status: 'success', message: 'Demo data reset to baseline simulation state.' };
   },
 
   /**

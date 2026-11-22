@@ -87,6 +87,14 @@ export const AuditLogsPage = () => {
         <SafetyRoleBanner />
         <SafetyNavigation />
 
+        {/* Demo Audit Notice */}
+        <div className="p-3 bg-slate-100 border border-slate-300 rounded-lg text-slate-700 text-xs flex items-center gap-2">
+          <Terminal className="w-4 h-4 text-slate-500 shrink-0" />
+          <span>
+            <strong>Demo Audit Trail Notice:</strong> This browser-side ledger records simulated events (assessments, collections, lab results, quarantine changes, clinical reviews). Client-side logs are for demonstration only and do not constitute an immutable, tamper-evident regulatory record.
+          </span>
+        </div>
+
         {/* Filters */}
         <Card className="p-4 border border-[#E2E8F0] bg-white">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">

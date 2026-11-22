@@ -1,5 +1,5 @@
 import React from 'react';
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { bloodSafetyService } from '../services/bloodSafetyService';
@@ -8,6 +8,10 @@ import { SafetyDashboardPage } from '../pages/bloodSafety/SafetyDashboardPage';
 import { SafetyAuthProvider } from '../context/SafetyAuthContext';
 
 describe('Blood Safety & Donor Health Verification System', () => {
+  beforeEach(async () => {
+    await bloodSafetyService.resetDemoData();
+  });
+
   it('contains all 5 statutory India-oriented infection screening categories', async () => {
     const res = await bloodSafetyService.getTestCatalogue();
     const codes = res.data.map((t) => t.testCode);
@@ -154,6 +158,68 @@ describe('Blood Safety & Donor Health Verification System', () => {
     const updatedDonation = await bloodSafetyService.getDonationById('DON-2026-0891');
     expect(updatedDonation.data.donation.dispositionStatus).toBe('Quarantined');
     expect(updatedDonation.data.releaseAudit.canRelease).toBe(false);
+  });
+
+  it('enforces centralized prerequisite checks during clinical review (cannot bypass via review modal)', async () => {
+    // Attempting to sign release on DON-2026-0892 (which has pending Malaria assay) via clinical review MUST be blocked
+    await expect(
+      bloodSafetyService.recordClinicalReview({
+        donationId: 'DON-2026-0892',
+        initialScreeningSummary: 'Review with pending assays',
+        confirmatoryTestingRequired: false,
+        confirmatoryStatus: 'None',
+        clinicalDecision: 'Attempted Release Bypass',
+        dispositionSigned: 'Approved for release',
+        clinicalNotes: 'Trying to approve while test is pending',
+      }, { name: 'Dr. Deshmukh', role: 'clinical_reviewer' })
+    ).rejects.toThrow(/Safety Lock Violated/i);
+  });
+
+  it('creates a donation from an accepted assessment with 5 pending tests in awaiting testing status', async () => {
+    // ASM-2026-101 is accepted for donation
+    const res = await bloodSafetyService.createDonationFromAssessment('ASM-2026-101', {
+      bloodComponent: 'Whole Blood 450ml',
+      volumeMl: 450,
+    }, { name: 'Nurse Gaikwad', role: 'blood_bank' });
+
+    expect(res.data.dispositionStatus).toBe('Awaiting testing');
+    expect(res.tests.length).toBe(5);
+    expect(res.tests.every((t) => t.resultStatus === 'Pending')).toBe(true);
+
+    // Release should be strictly blocked on this new unit
+    const audit = bloodSafetyService.evaluateUnitReleasePrerequisites(res.data.donationId);
+    expect(audit.canRelease).toBe(false);
+  });
+
+  it('filters donations for hospital role to only approved for release units with masked PII', async () => {
+    const hospitalView = await bloodSafetyService.getDonations({}, 'hospital');
+    expect(hospitalView.data.length).toBeGreaterThan(0);
+    expect(hospitalView.data.every((d) => d.dispositionStatus === 'Approved for release')).toBe(true);
+
+    // Quarantined unit DON-2026-0893 should be completely hidden from hospital view
+    expect(hospitalView.data.some((d) => d.donationId === 'DON-2026-0893')).toBe(false);
+
+    // Inspecting released unit as hospital coordinator strips sensitive donor PII
+    const detail = await bloodSafetyService.getDonationById('DON-2026-0891', 'hospital');
+    expect(detail.data.donation.donorMaskedName).toBe('Anonymized Volunteer Donor');
+    expect(detail.data.assessment).toBeNull();
+    expect(detail.data.followUp).toBeNull();
+  });
+
+  it('restricts donors from accessing peer donation records', async () => {
+    // Donor 'dnr-001' trying to access peer unit DON-2026-0893 (dnr-005)
+    await expect(
+      bloodSafetyService.getDonationById('DON-2026-0893', 'donor', 'dnr-001')
+    ).rejects.toThrow(/Access Denied/i);
+  });
+
+  it('resets demo data cleanly back to initial simulation baseline', async () => {
+    const reset = await bloodSafetyService.resetDemoData();
+    expect(reset.status).toBe('success');
+
+    // Fresh query should return baseline records
+    const donationsRes = await bloodSafetyService.getDonations();
+    expect(donationsRes.data.length).toBeGreaterThanOrEqual(5);
   });
 
   it('renders Safety Dashboard page with key surveillance metrics', async () => {

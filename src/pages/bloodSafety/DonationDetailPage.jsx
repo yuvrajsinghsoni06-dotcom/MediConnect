@@ -37,19 +37,22 @@ export const DonationDetailPage = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [actionMessage, setActionMessage] = useState(null);
   const [isUpdating, setIsUpdating] = useState(false);
+  const [authError, setAuthError] = useState(null);
   const { currentRole, currentUser, hasPermission } = useSafetyAuth();
 
   useEffect(() => {
     loadDonationDetails();
-  }, [id]);
+  }, [id, currentRole.id]);
 
   const loadDonationDetails = async () => {
     setIsLoading(true);
+    setAuthError(null);
     try {
-      const res = await bloodSafetyService.getDonationById(id);
+      const res = await bloodSafetyService.getDonationById(id, currentRole.id, currentUser.id);
       setData(res.data);
     } catch (err) {
-      console.error(err);
+      console.warn('Donation load restricted:', err.message);
+      setAuthError(err.message);
     } finally {
       setIsLoading(false);
     }
@@ -95,6 +98,31 @@ export const DonationDetailPage = () => {
 
   if (isLoading) {
     return <LoadingSpinner message={`Loading clinical records for donation ${id}...`} className="py-24" />;
+  }
+
+  if (authError) {
+    return (
+      <div className="w-full py-12 bg-slate-50 min-h-screen">
+        <div className="max-w-4xl mx-auto px-4 space-y-6">
+          <SafetyRoleBanner />
+          <Card className="p-8 text-center space-y-4 border-amber-200 bg-amber-50/50">
+            <div className="w-12 h-12 rounded-full bg-amber-100 text-amber-700 flex items-center justify-center mx-auto">
+              <ShieldAlert className="w-6 h-6" />
+            </div>
+            <h2 className="text-xl font-bold text-slate-900">Confidential Access Restricted</h2>
+            <p className="text-xs text-slate-600 max-w-md mx-auto">{authError}</p>
+            <p className="text-[11px] text-slate-500 italic">
+              Tip: Switch persona to <strong>Transfusion Medical Officer</strong> or <strong>Blood Bank Staff</strong> using the banner above to inspect unreleased units.
+            </p>
+            <div className="pt-2">
+              <Link to="/blood-safety/donations">
+                <Button variant="secondary" size="sm" icon={ArrowLeft}>Back to Available Records</Button>
+              </Link>
+            </div>
+          </Card>
+        </div>
+      </div>
+    );
   }
 
   if (!data || !data.donation) {

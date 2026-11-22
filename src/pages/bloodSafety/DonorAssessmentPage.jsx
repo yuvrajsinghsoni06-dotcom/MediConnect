@@ -295,6 +295,56 @@ export const DonorAssessmentPage = () => {
                   </div>
                 </div>
               </div>
+
+              {/* Linked Donation Action */}
+              <div className="pt-3 border-t border-slate-200">
+                {selectedAssessment.donationRecordId ? (
+                  <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-lg flex items-center justify-between">
+                    <div>
+                      <span className="text-[10px] text-emerald-700 font-bold uppercase block">Associated Donation Unit</span>
+                      <strong className="text-emerald-950 font-mono text-sm">{selectedAssessment.donationRecordId}</strong>
+                    </div>
+                    <a
+                      href={`/blood-safety/donation/${selectedAssessment.donationRecordId}`}
+                      className="px-3 py-1.5 bg-[#DC2626] text-white rounded-lg font-bold text-xs hover:bg-red-700 transition-colors"
+                    >
+                      Inspect Unit & Lab Results →
+                    </a>
+                  </div>
+                ) : selectedAssessment.outcome === 'Accepted for donation' ? (
+                  <div className="p-3 bg-sky-50 border border-sky-200 rounded-lg flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div>
+                      <span className="text-[10px] text-sky-700 font-bold uppercase block">Phlebotomy Ready</span>
+                      <span className="text-xs text-sky-950">Donor is clinically approved. Record collection & generate barcoded unit.</span>
+                    </div>
+                    <Button
+                      variant="primary"
+                      size="sm"
+                      disabled={!hasPermission('canRecordDonations')}
+                      onClick={async () => {
+                        try {
+                          const res = await bloodSafetyService.createDonationFromAssessment(
+                            selectedAssessment.assessmentId,
+                            {},
+                            { name: currentUser.name, role: currentRole.id }
+                          );
+                          setSelectedAssessment({ ...selectedAssessment, donationRecordId: res.data.donationId });
+                          loadAssessments();
+                          alert(`Blood collection recorded! Unit ${res.data.donationId} generated and placed in electronic quarantine.`);
+                        } catch (err) {
+                          alert(err.message);
+                        }
+                      }}
+                    >
+                      {hasPermission('canRecordDonations') ? 'Record Collection & Generate Unit' : 'Collection Restricted (Staff Only)'}
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="p-2.5 bg-slate-100 rounded-lg text-slate-500 text-[11px] text-center italic">
+                    Blood collection blocked due to deferred assessment outcome.
+                  </div>
+                )}
+              </div>
             </div>
           )}
         </Modal>

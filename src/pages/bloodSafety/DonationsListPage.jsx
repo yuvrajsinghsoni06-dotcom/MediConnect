@@ -22,6 +22,7 @@ import { SafetyNavigation } from '../../components/bloodSafety/SafetyNavigation'
 import { DispositionBadge } from '../../components/bloodSafety/DispositionBadge';
 import { RegulatoryDisclaimer } from '../../components/bloodSafety/RegulatoryDisclaimer';
 import { bloodSafetyService } from '../../services/bloodSafetyService';
+import { useSafetyAuth } from '../../context/SafetyAuthContext';
 import { BLOOD_GROUPS } from '../../utils/constants';
 
 export const DonationsListPage = () => {
@@ -30,19 +31,24 @@ export const DonationsListPage = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedGroup, setSelectedGroup] = useState('all');
   const [selectedDisposition, setSelectedDisposition] = useState('all');
+  const { currentRole, currentUser } = useSafetyAuth();
 
   useEffect(() => {
     fetchDonations();
-  }, [searchQuery, selectedGroup, selectedDisposition]);
+  }, [searchQuery, selectedGroup, selectedDisposition, currentRole.id]);
 
   const fetchDonations = async () => {
     setIsLoading(true);
     try {
-      const res = await bloodSafetyService.getDonations({
-        bloodGroup: selectedGroup,
-        dispositionStatus: selectedDisposition,
-        search: searchQuery,
-      });
+      const res = await bloodSafetyService.getDonations(
+        {
+          bloodGroup: selectedGroup,
+          dispositionStatus: selectedDisposition,
+          search: searchQuery,
+        },
+        currentRole.id,
+        currentUser.id
+      );
       setDonations(res.data);
     } catch (err) {
       console.error(err);
@@ -71,6 +77,21 @@ export const DonationsListPage = () => {
 
         <SafetyRoleBanner />
         <SafetyNavigation />
+
+        {/* Role-Specific Capability Callouts */}
+        {currentRole.id === 'hospital' && (
+          <div className="p-3.5 rounded-xl bg-blue-50 border border-blue-200 text-blue-900 text-xs flex items-center gap-2.5">
+            <span className="font-bold uppercase px-2 py-0.5 rounded bg-blue-200 text-blue-950 text-[10px]">Hospital Requisition View</span>
+            <span>Displaying certified transfusion-ready units approved by a Transfusion Medical Officer. Quarantined units and donor health identifiers are restricted.</span>
+          </div>
+        )}
+
+        {currentRole.id === 'donor' && (
+          <div className="p-3.5 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-900 text-xs flex items-center gap-2.5">
+            <span className="font-bold uppercase px-2 py-0.5 rounded bg-emerald-200 text-emerald-950 text-[10px]">Volunteer Donor View</span>
+            <span>Displaying your private donation record and release certification status. Peer records are confidential and hidden.</span>
+          </div>
+        )}
 
         {/* Filters */}
         <Card className="p-4 border border-[#E2E8F0] bg-white">

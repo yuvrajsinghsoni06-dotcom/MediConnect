@@ -26,8 +26,10 @@ import { useSafetyAuth } from '../../context/SafetyAuthContext';
 
 export const ClinicalReviewPage = () => {
   const [reviews, setReviews] = useState([]);
+  const [donations, setDonations] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [formError, setFormError] = useState(null);
   const [reviewFormData, setReviewFormData] = useState({
     donationId: 'DON-2026-0894',
     initialScreeningSummary: 'Inconclusive HIV-1/2 p24 ELISA optical density reading.',
@@ -41,12 +43,47 @@ export const ClinicalReviewPage = () => {
   const { currentRole, currentUser, hasPermission } = useSafetyAuth();
 
   useEffect(() => {
-    setReviews([...mockClinicalReviews]);
-    setIsLoading(false);
+    loadClinicalData();
   }, []);
+
+  const loadClinicalData = async () => {
+    setIsLoading(true);
+    try {
+      const [revRes, donRes] = await Promise.all([
+        bloodSafetyService.getClinicalReviews(),
+        bloodSafetyService.getDonations(),
+      ]);
+      setReviews(revRes.data);
+      setDonations(donRes.data);
+      if (donRes.data.length > 0 && !reviewFormData.donationId) {
+        setReviewFormData((prev) => ({ ...prev, donationId: donRes.data[0].donationId }));
+      }
+    } catch (err) {
+      console.error('Failed to load clinical reviews:', err);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const selectedUnitAudit = bloodSafetyService.evaluateUnitReleasePrerequisites(reviewFormData.donationId);
+
+  const handleDecisionChange = (val) => {
+    let signed = 'Under investigation';
+    if (val.includes('Release Approved')) signed = 'Approved for release';
+    else if (val.includes('Discard Approved')) signed = 'Discarded';
+    else if (val.includes('Quarantine')) signed = 'Quarantined';
+
+    setReviewFormData((prev) => ({
+      ...prev,
+      clinicalDecision: val,
+      dispositionSigned: signed,
+    }));
+    setFormError(null);
+  };
 
   const handleRecordReview = async (e) => {
     e.preventDefault();
+    setFormError(null);
     try {
       const res = await bloodSafetyService.recordClinicalReview(reviewFormData, {
         name: currentUser.name,
@@ -55,8 +92,9 @@ export const ClinicalReviewPage = () => {
 
       setReviews((prev) => [res.data, ...prev]);
       setSubmitSuccess(true);
+      loadClinicalData();
     } catch (err) {
-      alert(err.message);
+      setFormError(err.message);
     }
   };
 
@@ -183,18 +221,50 @@ export const ClinicalReviewPage = () => {
             </div>
           ) : (
             <form onSubmit={handleRecordReview} className="space-y-4 text-xs">
+              {formError && (
+                <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-red-900 text-xs flex items-start gap-2">
+                  <AlertTriangle className="w-4 h-4 text-red-600 shrink-0 mt-0.5" />
+                  <div className="space-y-1">
+                    <strong className="block">Clinical Release Blocked:</strong>
+                    <p className="whitespace-pre-line text-[11px]">{formError}</p>
+                  </div>
+                </div>
+              )}
+
               <Select
                 label="Target Blood Donation Reference"
                 required
                 value={reviewFormData.donationId}
                 onChange={(e) => setReviewFormData({ ...reviewFormData, donationId: e.target.value })}
               >
-                {mockDonationRecords.map((d) => (
+                {donations.map((d) => (
                   <option key={d.donationId} value={d.donationId}>
-                    {d.donationId} • {d.bloodComponent} ({d.dispositionStatus})
+                    {d.donationId} • {d.bloodGroup} {d.bloodComponent} ({d.dispositionStatus})
                   </option>
                 ))}
               </Select>
+
+              {/* Live Safety Check for Selected Donation */}
+              {reviewFormData.dispositionSigned === 'Approved for release' && (
+                selectedUnitAudit.canRelease ? (
+                  <div className="p-2.5 bg-emerald-50 border border-emerald-200 rounded-lg text-emerald-900 text-xs flex items-center gap-2">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                    <span>Unit satisfies all statutory criteria for transfusion release sign-off.</span>
+                  </div>
+                ) : (
+                  <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg text-amber-950 text-xs space-y-1">
+                    <div className="flex items-center gap-1.5 font-bold text-amber-900">
+                      <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
+                      <span>Cannot Approve Release (Unmet Safety Prerequisites):</span>
+                    </div>
+                    <ul className="list-disc pl-4 space-y-0.5 text-[11px] text-amber-800">
+                      {selectedUnitAudit.reasons.map((r, i) => (
+                        <li key={i}>{r}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )
+              )}
 
               <Input
                 label="Initial Screening Assay Trigger"
@@ -216,7 +286,7 @@ export const ClinicalReviewPage = () => {
                   label="Clinical Decision & Unit Action"
                   required
                   value={reviewFormData.clinicalDecision}
-                  onChange={(e) => setReviewFormData({ ...reviewFormData, clinicalDecision: e.target.value })}
+                  onChange={(e) => handleDecisionChange(e.target.value)}
                 >
                   <option value="Quarantine Under Investigation">Quarantine Under Investigation (Hold)</option>
                   <option value="Permanent Quarantine / Pending Confirmation">Permanent Quarantine (Non-Conforming)</option>

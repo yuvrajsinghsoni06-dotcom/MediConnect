@@ -315,6 +315,34 @@ export const QuarantineManagementPage = () => {
                 </Select>
               </div>
 
+              {/* Real-time Prerequisite Check Advisory */}
+              {dispositionChoice === 'Approved for release' && (
+                (() => {
+                  const check = bloodSafetyService.evaluateUnitReleasePrerequisites(actionModalUnit.donationId);
+                  if (check.canRelease) {
+                    return (
+                      <div className="p-2.5 bg-emerald-50 border border-emerald-200 rounded-lg text-emerald-900 text-xs flex items-center gap-2">
+                        <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                        <span>All 5 statutory tests non-reactive. Unit eligible for release sign-off.</span>
+                      </div>
+                    );
+                  }
+                  return (
+                    <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg text-amber-950 text-xs space-y-1">
+                      <div className="flex items-center gap-1 font-bold text-amber-900">
+                        <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
+                        <span>Release Prohibited (Unmet Safety Checkpoints):</span>
+                      </div>
+                      <ul className="list-disc pl-4 space-y-0.5 text-[11px] text-amber-900">
+                        {check.reasons.map((r, i) => (
+                          <li key={i}>{r}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  );
+                })()
+              )}
+
               <div>
                 <label className="block text-xs font-semibold text-slate-900 mb-1">
                   Transfusion Medical Officer Clinical Justification
