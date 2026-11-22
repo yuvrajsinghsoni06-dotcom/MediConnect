@@ -25,98 +25,37 @@ import { AuditLogsPage } from '../pages/bloodSafety/AuditLogsPage';
 
 export const AppRoutes = () => {
   return (
-    <Routes>
-      {/* Main Public & Authenticated Layout Wrapper */}
-      <Route element={<AppLayout />}>
-        {/* Public Pages */}
-        <Route path="/" element={<HomePage />} />
-        <Route path="/about" element={<AboutPage />} />
-        <Route path="/find-donors" element={<FindDonorsPage />} />
-        <Route path="/campaigns" element={<CampaignsPage />} />
-        <Route path="/contact" element={<ContactPage />} />
+    <SafetyAuthProvider>
+      <Routes>
+        {/* Main Public & Authenticated Layout Wrapper */}
+        <Route element={<AppLayout />}>
+          {/* Public Pages */}
+          <Route path="/" element={<HomePage />} />
+          <Route path="/about" element={<AboutPage />} />
+          <Route path="/find-donors" element={<FindDonorsPage />} />
+          <Route path="/campaigns" element={<CampaignsPage />} />
+          <Route path="/contact" element={<ContactPage />} />
 
-        {/* Authentication Pages */}
-        <Route path="/login" element={<LoginPage />} />
-        <Route path="/register" element={<RegisterPage />} />
-        <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+          {/* Authentication Pages */}
+          <Route path="/login" element={<LoginPage />} />
+          <Route path="/register" element={<RegisterPage />} />
+          <Route path="/forgot-password" element={<ForgotPasswordPage />} />
 
-        {/* Blood Safety & Donor Health Verification Module */}
-        <Route
-          path="/blood-safety"
-          element={
-            <SafetyAuthProvider>
-              <SafetyDashboardPage />
-            </SafetyAuthProvider>
-          }
-        />
-        <Route
-          path="/blood-safety/donor-assessment"
-          element={
-            <SafetyAuthProvider>
-              <DonorAssessmentPage />
-            </SafetyAuthProvider>
-          }
-        />
-        <Route
-          path="/blood-safety/donations"
-          element={
-            <SafetyAuthProvider>
-              <DonationsListPage />
-            </SafetyAuthProvider>
-          }
-        />
-        <Route
-          path="/blood-safety/donation/:id"
-          element={
-            <SafetyAuthProvider>
-              <DonationDetailPage />
-            </SafetyAuthProvider>
-          }
-        />
-        <Route
-          path="/blood-safety/laboratory"
-          element={
-            <SafetyAuthProvider>
-              <LaboratoryTestingPage />
-            </SafetyAuthProvider>
-          }
-        />
-        <Route
-          path="/blood-safety/quarantine"
-          element={
-            <SafetyAuthProvider>
-              <QuarantineManagementPage />
-            </SafetyAuthProvider>
-          }
-        />
-        <Route
-          path="/blood-safety/clinical-review"
-          element={
-            <SafetyAuthProvider>
-              <ClinicalReviewPage />
-            </SafetyAuthProvider>
-          }
-        />
-        <Route
-          path="/blood-safety/follow-up"
-          element={
-            <SafetyAuthProvider>
-              <ConfidentialFollowUpPage />
-            </SafetyAuthProvider>
-          }
-        />
-        <Route
-          path="/blood-safety/audit-logs"
-          element={
-            <SafetyAuthProvider>
-              <AuditLogsPage />
-            </SafetyAuthProvider>
-          }
-        />
+          {/* Blood Safety & Donor Health Verification Module */}
+          <Route path="/blood-safety" element={<SafetyDashboardPage />} />
+          <Route path="/blood-safety/donor-assessment" element={<DonorAssessmentPage />} />
+          <Route path="/blood-safety/donations" element={<DonationsListPage />} />
+          <Route path="/blood-safety/donation/:id" element={<DonationDetailPage />} />
+          <Route path="/blood-safety/laboratory" element={<LaboratoryTestingPage />} />
+          <Route path="/blood-safety/quarantine" element={<QuarantineManagementPage />} />
+          <Route path="/blood-safety/clinical-review" element={<ClinicalReviewPage />} />
+          <Route path="/blood-safety/follow-up" element={<ConfidentialFollowUpPage />} />
+          <Route path="/blood-safety/audit-logs" element={<AuditLogsPage />} />
 
-        {/* 404 Catch-All */}
-        <Route path="*" element={<NotFoundPage />} />
-      </Route>
-    </Routes>
+          {/* 404 Catch-All */}
+          <Route path="*" element={<NotFoundPage />} />
+        </Route>
+      </Routes>
+    </SafetyAuthProvider>
   );
 };

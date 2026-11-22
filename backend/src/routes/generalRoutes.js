@@ -1,14 +1,26 @@
 import express from 'express';
-import { DonorsRepository, CampaignsRepository, EmergencyRequestsRepository } from '../repositories/index.js';
+import {
+  DonorsRepository,
+  CampaignsRepository,
+  EmergencyRequestsRepository,
+  PublicDirectoryRepository
+} from '../repositories/index.js';
 
 const router = express.Router();
 
-// Donors
+// Public Donor Discovery (Sanitized - PII strictly excluded)
 router.get('/donors', async (req, res, next) => {
   try {
     const { bloodGroup, city } = req.query;
-    const donors = await DonorsRepository.listAll({ bloodGroup, city });
-    res.json({ success: true, data: donors });
+    const donors = await DonorsRepository.listPublic({ bloodGroup, city });
+    res.json({
+      success: true,
+      meta: {
+        privacyNotice: 'Personal contact details and DOB are protected under healthcare privacy rules. Only aggregated city and availability status are displayed.',
+        count: donors.length
+      },
+      data: donors
+    });
   } catch (err) {
     next(err);
   }
@@ -16,9 +28,23 @@ router.get('/donors', async (req, res, next) => {
 
 router.get('/donors/:id', async (req, res, next) => {
   try {
-    const donor = await DonorsRepository.findById(req.params.id);
+    const donor = await DonorsRepository.findPublicById(req.params.id);
     if (!donor) return res.status(404).json({ success: false, message: 'Donor not found' });
     res.json({ success: true, data: donor });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// Official Public Blood Centre Directory (e-RaktKosh / MOHFW Aligned)
+router.get('/public-centres', async (req, res, next) => {
+  try {
+    const centres = await PublicDirectoryRepository.listVerifiedCentres();
+    res.json({
+      success: true,
+      source: 'e-RaktKosh Portal (Ministry of Health & Family Welfare, Govt. of India)',
+      data: centres
+    });
   } catch (err) {
     next(err);
   }

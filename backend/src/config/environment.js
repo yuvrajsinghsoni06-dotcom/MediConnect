@@ -7,13 +7,27 @@ const __dirname = path.dirname(__filename);
 
 dotenv.config({ path: path.resolve(__dirname, '../../.env') });
 
+const env = process.env.NODE_ENV || 'development';
+const jwtSecret = process.env.JWT_SECRET || 'mediconnect-super-secret-jwt-key-change-in-production-2026';
+
+// Security check: Never allow weak/default JWT secret outside development
+if (env === 'production') {
+  if (!process.env.JWT_SECRET || process.env.JWT_SECRET.length < 32 || process.env.JWT_SECRET.includes('super-secret')) {
+    throw new Error('FATAL SECURITY CONFIGURATION: A strong JWT_SECRET of at least 32 characters must be provided in production.');
+  }
+}
+
+// Parse allowed CORS origins
+const rawCors = process.env.CORS_ORIGIN || 'http://localhost:5173,http://localhost:3000';
+const allowedOrigins = rawCors.split(',').map(s => s.trim()).filter(Boolean);
+
 export const config = {
-  env: process.env.NODE_ENV || 'development',
+  env,
   port: parseInt(process.env.PORT || '5000', 10),
   apiPrefix: process.env.API_PREFIX || '/api/v1',
-  corsOrigin: process.env.CORS_ORIGIN || 'http://localhost:5173',
+  corsOrigin: allowedOrigins,
   jwt: {
-    secret: process.env.JWT_SECRET || 'mediconnect-super-secret-jwt-key-change-in-production-2026',
+    secret: jwtSecret,
     expiresIn: process.env.JWT_EXPIRES_IN || '24h'
   },
   db: {

@@ -238,4 +238,33 @@ describe('Blood Safety & Donor Health Verification System', () => {
       expect(screen.getByText(/Unit Release Clinical Mandate/i)).toBeInTheDocument();
     });
   });
+
+  it('restores authenticated session from localStorage on refresh and maps backend roles', () => {
+    // Simulate user having logged in previously and refreshed browser
+    const mockUser = {
+      userId: 'USR-BBS-001',
+      name: 'Staff Nurse Rohit Verma',
+      email: 'staff.rohit@mediconnect.local',
+      role: 'blood_bank_staff',
+      department: 'Blood Bank Phlebotomy'
+    };
+    localStorage.setItem('mediconnect_auth_token', 'mock-jwt-token-12345');
+    localStorage.setItem('mediconnect_user', JSON.stringify(mockUser));
+
+    render(
+      <MemoryRouter initialEntries={['/blood-safety']}>
+        <SafetyAuthProvider>
+          <SafetyDashboardPage />
+        </SafetyAuthProvider>
+      </MemoryRouter>
+    );
+
+    // Verify authenticated persona is displayed with mapped role
+    expect(screen.getByText(/Staff Nurse Rohit Verma/i)).toBeInTheDocument();
+    expect(screen.getByText(/Authenticated Session/i)).toBeInTheDocument();
+
+    // Clean up
+    localStorage.removeItem('mediconnect_auth_token');
+    localStorage.removeItem('mediconnect_user');
+  });
 });
