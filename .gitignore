@@ -1,61 +1,930 @@
-# Dependencies
-node_modules/
-.pnp
-.pnp.js
 
-# Production build outputs
-dist/
-dist-ssr/
-build/
-out/
+# 🩸 MediConnect
+### Blood Donation & Emergency Blood Management System
 
-# Environment variables & secrets
-.env
-.env.local
-.env.development.local
-.env.test.local
-.env.production.local
-*.env
+> A DBMS-driven web application designed to connect blood donors, patients, hospitals, and blood banks during emergency blood requirements.
 
-# Vite / bundler caches
-.vite/
-.cache/
-.parcel-cache/
+---
 
-# Logs
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-pnpm-debug.log*
-lerna-debug.log*
-*.log
+## 📌 Project Overview
 
-# Editor & IDE directories
-.vscode/*
-!.vscode/extensions.json
-.idea/
-*.suo
-*.ntvs*
-*.njsproj
-*.sln
-*.sw?
-*.sublime-project
-*.sublime-workspace
+MediConnect is a web-based blood donation and emergency blood management platform developed to simplify the process of finding blood donors and managing blood requests.
 
-# Operating System files
-.DS_Store
-.DS_Store?
-._*
-.Spotlight-V100
-.Trashes
-ehthumbs.db
-Thumbs.db
-Desktop.ini
+The system aims to connect patients who require blood with registered donors, hospitals, and blood banks through a centralized platform. It provides functionalities such as donor registration, emergency blood requests, blood group searching, donor matching, blood bank inventory management, and request tracking.
 
-# Testing & Coverage
-coverage/
-.nyc_output/
+The project is primarily developed from a **Database Management System (DBMS) perspective**, focusing on efficient data organization, relational database design, integrity constraints, normalization, transaction management, and SQL-based operations.
 
-# Temporary files
-tmp/
-temp/
+MediConnect aims to reduce the time required to find potential blood donors during medical emergencies by maintaining structured and accessible information.
+
+---
+
+## 🎯 Problem Statement
+
+During medical emergencies, patients and their families often face difficulties finding suitable blood donors within a limited time.
+
+Traditional blood donation processes frequently depend on personal contacts, social media posts, hospital networks, and manually maintained donor lists. These methods can lead to delays, duplicate requests, outdated information, and difficulty identifying available donors.
+
+Blood banks may also face challenges in maintaining accurate inventory records, tracking blood component availability, and managing expiry dates.
+
+MediConnect proposes a centralized database-driven solution that allows users to register as blood donors, create emergency blood requests, search for potential donors, and access blood bank information.
+
+The system aims to improve the organization, accessibility, and management of blood donation information through database technology.
+
+---
+
+## 🎯 Objectives
+
+The primary objectives of MediConnect are:
+
+- To create a centralized database of registered blood donors.
+- To facilitate emergency blood requests.
+- To enable searching of potential donors based on blood group and location.
+- To maintain donor availability information.
+- To manage blood bank inventory records.
+- To track blood donation history.
+- To maintain request and response records.
+- To reduce duplicate and incomplete records.
+- To implement relational database concepts effectively.
+- To demonstrate SQL queries, joins, subqueries, views, triggers, stored procedures, and transactions.
+- To provide a secure and user-friendly interface for accessing database information.
+
+---
+
+## 🚀 Project Scope
+
+MediConnect focuses primarily on blood donation and emergency blood management.
+
+### Core Modules
+
+| Module | Description |
+|---|---|
+| User Management | Registration, login, profile management, and user roles |
+| Donor Management | Donor profiles, blood groups, location, and availability |
+| Blood Requests | Creation, management, and tracking of blood requests |
+| Donor Matching | Searching potential donors based on request requirements |
+| Blood Bank Management | Blood bank registration and inventory management |
+| Donation History | Records of previous blood donations |
+| Notifications | Request alerts and donor responses |
+| Hospital Management | Hospital registration and request management |
+| Admin Management | Verification, monitoring, and system administration |
+
+---
+
+## 👥 User Roles
+
+### 1. Patient / Requester
+- Register and log in.
+- Create emergency blood requests.
+- Specify blood group and required quantity.
+- Search for blood banks.
+- Track request status.
+- View donor responses.
+
+### 2. Blood Donor
+- Register as a donor.
+- Provide blood group and location.
+- Manage availability.
+- Receive blood request notifications.
+- Accept or decline requests.
+- View donation history.
+
+### 3. Hospital
+- Register hospital details.
+- Create blood requests.
+- Manage emergency requirements.
+- Access blood bank information.
+
+### 4. Blood Bank
+- Maintain blood inventory.
+- Update stock availability.
+- Manage blood components.
+- Record inventory transactions.
+- Track expiry dates.
+
+### 5. Administrator
+- Manage users.
+- Verify donor and organization records.
+- Monitor blood requests.
+- Manage reports.
+- Maintain platform integrity.
+
+---
+
+## 🛠️ Technology Stack
+
+### Frontend
+- React.js
+- Vite
+- Tailwind CSS
+- React Router DOM
+- Axios
+- Lucide React
+
+### Backend
+- Node.js
+- Express.js
+- REST API
+
+### Database
+- MySQL
+
+### Real-Time Communication
+- Socket.IO
+
+### External Services
+- Google Maps API
+- Google Places API
+- Email / SMS notification services
+- Blood bank information APIs, subject to availability and authorization
+
+### Development Tools
+- Visual Studio Code
+- Git
+- GitHub
+- MySQL Workbench
+- Postman
+
+---
+
+# 🗄️ Database Management System
+
+## Database Name
+
+```sql
+mediconnect_db
+```
+
+The database is designed using a relational database model.
+
+The database stores information related to users, donors, blood groups, blood requests, blood banks, inventory, donations, notifications, and verification records.
+
+The proposed database design uses primary keys, foreign keys, unique constraints, check constraints, indexes, and transactions to maintain data consistency and integrity.
+
+---
+
+## 📊 Proposed Database Tables
+
+### 1. Users
+
+Stores common information about all registered users.
+
+| Attribute | Description |
+|---|---|
+| user_id | Primary Key |
+| full_name | User's full name |
+| email | Unique email address |
+| phone | Contact number |
+| password_hash | Hashed password |
+| role_id | Foreign Key |
+| created_at | Registration date |
+| account_status | Account status |
+
+### 2. Roles
+
+Stores different roles available in the system.
+
+| Attribute | Description |
+|---|---|
+| role_id | Primary Key |
+| role_name | Patient, Donor, Hospital, Blood Bank, Admin |
+
+### 3. Donors
+
+Stores donor-specific information.
+
+| Attribute | Description |
+|---|---|
+| donor_id | Primary Key |
+| user_id | Foreign Key |
+| blood_group_id | Foreign Key |
+| city | Donor's city |
+| state | Donor's state |
+| address | Donor's address |
+| availability_status | Availability |
+| last_donation_date | Previous donation date |
+| verification_status | Verification status |
+
+### 4. Blood_Groups
+
+Stores available blood group classifications.
+
+| Attribute | Description |
+|---|---|
+| blood_group_id | Primary Key |
+| blood_group_name | A+, A-, B+, B-, AB+, AB-, O+, O- |
+
+### 5. Blood_Requests
+
+Stores emergency blood requests.
+
+| Attribute | Description |
+|---|---|
+| request_id | Primary Key |
+| requester_id | Foreign Key |
+| hospital_id | Foreign Key |
+| blood_group_id | Foreign Key |
+| component_type | Required blood component |
+| quantity | Required quantity |
+| city | Required location |
+| urgency_level | Normal, Urgent, Critical |
+| required_date | Required date |
+| request_status | Current status |
+| created_at | Request creation time |
+
+### 6. Donor_Matches
+
+Stores potential donor matches for blood requests.
+
+| Attribute | Description |
+|---|---|
+| match_id | Primary Key |
+| request_id | Foreign Key |
+| donor_id | Foreign Key |
+| match_status | Pending, Accepted, Declined |
+| matched_at | Match creation time |
+| response_time | Donor response time |
+
+### 7. Blood_Banks
+
+Stores registered blood bank information.
+
+| Attribute | Description |
+|---|---|
+| blood_bank_id | Primary Key |
+| name | Blood bank name |
+| registration_number | Registration number |
+| address | Blood bank address |
+| city | City |
+| phone | Contact number |
+| verification_status | Verification status |
+
+### 8. Blood_Inventory
+
+Stores blood bank stock information.
+
+| Attribute | Description |
+|---|---|
+| inventory_id | Primary Key |
+| blood_bank_id | Foreign Key |
+| blood_group_id | Foreign Key |
+| component_type | Blood component |
+| quantity | Available quantity |
+| expiry_date | Expiry date |
+| last_updated | Last stock update |
+
+### 9. Donations
+
+Stores donation history records.
+
+| Attribute | Description |
+|---|---|
+| donation_id | Primary Key |
+| donor_id | Foreign Key |
+| blood_bank_id | Foreign Key |
+| donation_date | Donation date |
+| component_type | Donated component |
+| quantity | Quantity donated |
+| donation_status | Donation status |
+
+### 10. Hospitals
+
+Stores registered hospital details.
+
+| Attribute | Description |
+|---|---|
+| hospital_id | Primary Key |
+| hospital_name | Hospital name |
+| registration_number | Registration number |
+| address | Hospital address |
+| city | City |
+| contact_number | Contact number |
+| verification_status | Verification status |
+
+### 11. Notifications
+
+Stores notification records.
+
+| Attribute | Description |
+|---|---|
+| notification_id | Primary Key |
+| user_id | Foreign Key |
+| request_id | Foreign Key |
+| message | Notification message |
+| notification_type | Notification category |
+| is_read | Read status |
+| created_at | Notification time |
+
+### 12. Verification_Records
+
+Stores verification details of users and organizations.
+
+| Attribute | Description |
+|---|---|
+| verification_id | Primary Key |
+| user_id | Foreign Key |
+| entity_type | Donor, Hospital, Blood Bank |
+| verification_status | Pending, Verified, Rejected |
+| verified_by | Admin ID |
+| verified_at | Verification date |
+
+---
+
+## 🔗 Database Relationships
+
+The proposed database follows relational database principles.
+
+### Relationship Structure
+
+- One Role can be assigned to multiple Users.
+- One User can have one Donor Profile.
+- One Blood Group can be associated with multiple Donors.
+- One User can create multiple Blood Requests.
+- One Blood Request can have multiple Donor Matches.
+- One Donor can be associated with multiple Donor Matches.
+- One Blood Bank can maintain multiple Inventory Records.
+- One Blood Group can have multiple Inventory Records.
+- One Donor can have multiple Donation Records.
+- One Hospital can create multiple Blood Requests.
+- One User can receive multiple Notifications.
+
+### Relationship Types
+
+| Relationship | Type |
+|---|---|
+| Roles → Users | One-to-Many |
+| Users → Donors | One-to-One |
+| Blood Groups → Donors | One-to-Many |
+| Users → Blood Requests | One-to-Many |
+| Blood Requests → Donor Matches | One-to-Many |
+| Donors → Donor Matches | One-to-Many |
+| Blood Banks → Inventory | One-to-Many |
+| Blood Groups → Inventory | One-to-Many |
+| Donors → Donations | One-to-Many |
+| Hospitals → Blood Requests | One-to-Many |
+
+---
+
+## 🧩 ER Diagram
+
+The Entity Relationship Diagram represents the relationships between the database entities.
+
+### Main Entities
+
+```text
+USERS
+  |
+  |------ ROLES
+  |
+  |------ DONORS
+  |          |
+  |          |------ BLOOD_GROUPS
+  |          |
+  |          |------ DONATIONS
+  |          |
+  |          |------ DONOR_MATCHES
+  |
+  |------ BLOOD_REQUESTS
+  |          |
+  |          |------ DONOR_MATCHES
+  |
+  |------ NOTIFICATIONS
+  |
+HOSPITALS
+  |
+  |------ BLOOD_REQUESTS
+  |
+BLOOD_BANKS
+  |
+  |------ BLOOD_INVENTORY
+               |
+               |------ BLOOD_GROUPS
+```
+
+The ER diagram will be developed and maintained separately as part of the database design documentation.
+
+---
+
+# 📚 DBMS Concepts Implemented
+
+## 1. Primary Keys
+
+Primary keys uniquely identify each record in a table.
+
+Examples:
+
+```sql
+user_id
+donor_id
+request_id
+blood_bank_id
+inventory_id
+```
+
+## 2. Foreign Keys
+
+Foreign keys establish relationships between tables.
+
+Example:
+
+```sql
+FOREIGN KEY (blood_group_id)
+REFERENCES Blood_Groups(blood_group_id);
+```
+
+## 3. Constraints
+
+The database uses:
+
+- PRIMARY KEY
+- FOREIGN KEY
+- UNIQUE
+- NOT NULL
+- CHECK
+- DEFAULT
+
+These constraints help maintain valid and consistent records.
+
+## 4. Normalization
+
+The database design aims to reduce data redundancy and improve data integrity.
+
+### First Normal Form (1NF)
+
+Each attribute contains atomic values.
+
+### Second Normal Form (2NF)
+
+The database eliminates partial dependencies on composite keys.
+
+### Third Normal Form (3NF)
+
+The database eliminates unnecessary transitive dependencies.
+
+Blood group information, user roles, and organization details are maintained in separate tables to avoid unnecessary duplication.
+
+## 5. SQL Queries
+
+The project demonstrates:
+
+- SELECT
+- INSERT
+- UPDATE
+- DELETE
+- WHERE
+- ORDER BY
+- GROUP BY
+- HAVING
+- Aggregate Functions
+
+## 6. Joins
+
+The project demonstrates:
+
+- INNER JOIN
+- LEFT JOIN
+- RIGHT JOIN
+
+Joins are used to retrieve information from related tables.
+
+Example:
+
+```sql
+SELECT
+    d.donor_id,
+    u.full_name,
+    bg.blood_group_name,
+    d.city
+FROM Donors d
+JOIN Users u
+    ON d.user_id = u.user_id
+JOIN Blood_Groups bg
+    ON d.blood_group_id = bg.blood_group_id;
+```
+
+## 7. Subqueries
+
+Subqueries can be used to identify donors, requests, and blood banks based on nested conditions.
+
+Example:
+
+```sql
+SELECT full_name
+FROM Users
+WHERE user_id IN (
+    SELECT user_id
+    FROM Donors
+    WHERE blood_group_id = 1
+);
+```
+
+## 8. Views
+
+Views provide simplified access to frequently required data.
+
+Example:
+
+```sql
+CREATE VIEW Donor_Directory AS
+SELECT
+    d.donor_id,
+    u.full_name,
+    bg.blood_group_name,
+    d.city,
+    d.availability_status
+FROM Donors d
+JOIN Users u
+    ON d.user_id = u.user_id
+JOIN Blood_Groups bg
+    ON d.blood_group_id = bg.blood_group_id;
+```
+
+## 9. Stored Procedures
+
+Stored procedures can be used to perform frequently required database operations.
+
+Examples:
+
+- Search donors by blood group and location.
+- Create a blood request.
+- Update donor availability.
+- Update blood inventory.
+- Retrieve request status.
+
+## 10. Triggers
+
+Triggers can automate database operations.
+
+Examples:
+
+- Maintain inventory transaction history.
+- Record status changes.
+- Update timestamps.
+- Prevent invalid inventory updates.
+
+## 11. Transactions
+
+Transactions ensure that multiple database operations are completed consistently.
+
+Example:
+
+When blood inventory is updated, the inventory quantity and transaction history should be maintained together.
+
+```sql
+START TRANSACTION;
+
+UPDATE Blood_Inventory
+SET quantity = quantity - 1
+WHERE inventory_id = 1
+AND quantity >= 1;
+
+INSERT INTO Inventory_Transactions
+(inventory_id, transaction_type, quantity)
+VALUES
+(1, 'ISSUED', 1);
+
+COMMIT;
+```
+
+In the actual implementation, transaction validation and rollback handling will be added to prevent inconsistent inventory records.
+
+## 12. Indexing
+
+Indexes improve database search performance.
+
+Potential indexes:
+
+```sql
+CREATE INDEX idx_donor_blood_group
+ON Donors(blood_group_id);
+
+CREATE INDEX idx_donor_city
+ON Donors(city);
+
+CREATE INDEX idx_request_status
+ON Blood_Requests(request_status);
+
+CREATE INDEX idx_inventory_blood_group
+ON Blood_Inventory(blood_group_id);
+```
+
+---
+
+# 🔄 System Workflow
+
+## Blood Donation Workflow
+
+1. A donor registers on MediConnect.
+2. The donor enters blood group and location information.
+3. The system stores the donor information in MySQL.
+4. The donor's profile is verified.
+5. The donor manages availability.
+
+## Emergency Blood Request Workflow
+
+1. A patient or hospital creates a blood request.
+2. The system stores the request in the database.
+3. Potential donors are identified using search criteria.
+4. Matching donors receive notifications.
+5. Donors respond to the request.
+6. The requester tracks responses.
+7. The request status is updated.
+
+## Blood Bank Workflow
+
+1. A blood bank registers on the platform.
+2. The administrator verifies the blood bank.
+3. The blood bank updates its inventory.
+4. The system stores inventory information.
+5. Users search for blood bank availability.
+6. Inventory transactions are recorded.
+
+---
+
+# 🔌 Proposed API Endpoints
+
+### Authentication
+
+| Method | Endpoint | Description |
+|---|---|---|
+| POST | `/api/auth/register` | Register user |
+| POST | `/api/auth/login` | Login user |
+| POST | `/api/auth/logout` | Logout user |
+
+### Donors
+
+| Method | Endpoint | Description |
+|---|---|---|
+| POST | `/api/donors/register` | Register donor |
+| GET | `/api/donors` | Retrieve donors |
+| GET | `/api/donors/search` | Search donors |
+| PUT | `/api/donors/availability` | Update availability |
+
+### Blood Requests
+
+| Method | Endpoint | Description |
+|---|---|---|
+| POST | `/api/blood-requests` | Create request |
+| GET | `/api/blood-requests` | Retrieve requests |
+| GET | `/api/blood-requests/:id` | Retrieve request details |
+| PUT | `/api/blood-requests/:id/status` | Update request status |
+
+### Blood Banks
+
+| Method | Endpoint | Description |
+|---|---|---|
+| GET | `/api/blood-banks` | Retrieve blood banks |
+| GET | `/api/blood-banks/:id` | Retrieve blood bank details |
+| GET | `/api/blood-inventory` | Retrieve inventory |
+| PUT | `/api/blood-inventory/:id` | Update inventory |
+
+### Admin
+
+| Method | Endpoint | Description |
+|---|---|---|
+| GET | `/api/admin/users` | Manage users |
+| PUT | `/api/admin/verify/:id` | Verify user |
+| GET | `/api/admin/reports` | Retrieve reports |
+
+---
+
+# 🔐 Security and Privacy
+
+MediConnect is designed to handle personal information responsibly.
+
+The proposed security measures include:
+
+- Password hashing.
+- JWT-based authentication.
+- Role-based access control.
+- Input validation.
+- Secure API endpoints.
+- Protected database access.
+- Environment variables for API credentials.
+- Verification of donors and organizations.
+- Rate limiting.
+- Audit logs.
+- Secure handling of personal contact information.
+
+Personal donor information should not be publicly exposed without appropriate consent.
+
+---
+
+# 📁 Project Structure
+
+```text
+MediConnect/
+│
+├── frontend/
+│   ├── public/
+│   ├── src/
+│   │   ├── components/
+│   │   ├── pages/
+│   │   ├── dashboards/
+│   │   ├── layouts/
+│   │   ├── services/
+│   │   ├── hooks/
+│   │   ├── App.jsx
+│   │   └── main.jsx
+│   └── package.json
+│
+├── backend/
+│   ├── config/
+│   ├── controllers/
+│   ├── middleware/
+│   ├── models/
+│   ├── routes/
+│   ├── services/
+│   ├── utils/
+│   ├── app.js
+│   └── server.js
+│
+├── database/
+│   ├── schema.sql
+│   ├── relationships.sql
+│   ├── views.sql
+│   ├── procedures.sql
+│   ├── triggers.sql
+│   └── sample_data.sql
+│
+├── docs/
+│   ├── ER_Diagram.png
+│   ├── Database_Schema.png
+│   ├── Data_Flow_Diagram.png
+│   └── Project_Report.pdf
+│
+├── .gitignore
+├── README.md
+└── package.json
+```
+
+---
+
+# ⚙️ Installation and Setup
+
+> The following setup instructions represent the planned development environment. Commands and configuration may change as the application is developed.
+
+## Prerequisites
+
+Install the following software:
+
+- Node.js
+- npm
+- MySQL Server
+- MySQL Workbench
+- Visual Studio Code
+- Git
+
+## 1. Clone the Repository
+
+```bash
+git clone https://github.com/your-username/MediConnect.git
+```
+
+```bash
+cd MediConnect
+```
+
+## 2. Frontend Setup
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+The frontend will run locally using Vite.
+
+## 3. Backend Setup
+
+```bash
+cd backend
+npm install
+```
+
+Create a `.env` file:
+
+```env
+PORT=5000
+
+DB_HOST=localhost
+DB_USER=root
+DB_PASSWORD=your_mysql_password
+DB_NAME=mediconnect_db
+
+JWT_SECRET=your_secret_key
+```
+
+Start the backend:
+
+```bash
+npm run dev
+```
+
+## 4. Database Setup
+
+Open MySQL Workbench.
+
+Create the database:
+
+```sql
+CREATE DATABASE mediconnect_db;
+```
+
+Select the database:
+
+```sql
+USE mediconnect_db;
+```
+
+Execute the SQL files in the database folder after they are created.
+
+---
+
+# 📈 Future Scope
+
+The project can be expanded with:
+
+- AI-powered donor search.
+- Real-time emergency notifications.
+- Location-based donor matching.
+- Google Maps integration.
+- Verified blood bank directory.
+- Live blood inventory integration where authorized.
+- Mobile application.
+- Donation history tracking.
+- Automated inventory expiry alerts.
+- Hospital and doctor directory.
+- Analytics dashboard.
+- Cloud deployment using AWS.
+- Docker containerization.
+- Advanced security and monitoring.
+
+---
+
+# ⚠️ Limitations and Medical Disclaimer
+
+MediConnect is intended to facilitate blood donation coordination and information management.
+
+The application does not replace professional medical advice or authorized blood bank procedures.
+
+Blood compatibility, donor eligibility, medical suitability, and actual blood availability must be confirmed by qualified healthcare professionals or authorized blood banks.
+
+The platform should not guarantee donor availability or blood compatibility based solely on database records.
+
+---
+
+# 🎓 Academic Significance
+
+MediConnect demonstrates the practical application of Database Management System concepts in a real-world healthcare coordination problem.
+
+The project incorporates:
+
+- Relational database design.
+- Entity Relationship modeling.
+- Primary and foreign keys.
+- Database normalization.
+- Referential integrity.
+- SQL queries.
+- Joins.
+- Subqueries.
+- Views.
+- Stored procedures.
+- Triggers.
+- Transactions.
+- Indexing.
+- CRUD operations.
+- Database security.
+
+The project demonstrates how a well-designed database can support a real-world application by organizing information, reducing redundancy, maintaining consistency, and improving data retrieval.
+
+---
+
+# 👨‍💻 Project Development
+
+**Project Name:** MediConnect
+
+**Project Type:** Web-Based Application
+
+**Domain:** Blood Donation and Healthcare Coordination
+
+**Academic Focus:** Database Management System (DBMS)
+
+**Course:** B.Tech Computer Science and Engineering
+
+**Developer:** Anubhab Bhattacharjee
+
+---
+
+# 📄 License
+
+This project is developed for educational and academic purposes.
+
+A suitable open-source license may be added after the project is finalized.
+
+---
+
+## ❤️ MediConnect
+
+### Connecting Blood Donors. Supporting Emergencies. Saving Lives.
+
+A centralized platform designed to make blood donation coordination faster, more accessible, and more organized.
