@@ -69,6 +69,22 @@ describe('MediConnect Forms & Validation', () => {
     expect(screen.getByLabelText(/Hide password/i)).toBeInTheDocument();
   });
 
+  it('displays validation error on empty credentials submission', async () => {
+    render(
+      <MemoryRouter>
+        <LoginPage />
+      </MemoryRouter>
+    );
+
+    const submitBtn = screen.getByRole('button', { name: /^Sign In$/i });
+    fireEvent.click(submitBtn);
+
+    await waitFor(() => {
+      expect(screen.getByText(/Please provide a valid email address/i)).toBeInTheDocument();
+      expect(screen.getByText(/Password is required/i)).toBeInTheDocument();
+    });
+  });
+
   it('validates password mismatch on Registration page', async () => {
     render(
       <MemoryRouter>

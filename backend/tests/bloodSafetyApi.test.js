@@ -2,6 +2,7 @@ import { test, describe, before } from 'node:test';
 import assert from 'node:assert/strict';
 import request from 'supertest';
 import app from '../src/app.js';
+import { AuditLogsRepository } from '../src/repositories/index.js';
 
 describe('MediConnect Backend API & Safety Safeguards Integration Tests', () => {
   let adminToken;
@@ -45,6 +46,16 @@ describe('MediConnect Backend API & Safety Safeguards Integration Tests', () => 
     assert.ok(hospitalToken);
   });
 
+  test('POST /api/v1/auth/login normalizes email (case-insensitive and trimmed)', async () => {
+    const res = await request(app)
+      .post('/api/v1/auth/login')
+      .send({ email: '  DR.PRIYA.TMO@MEDICONNECT.LOCAL  ', password: 'Password@123' });
+
+    assert.equal(res.status, 200);
+    assert.ok(res.body.token);
+    assert.equal(res.body.user.userId, 'USR-TMO-001');
+  });
+
   test('POST /api/v1/auth/login rejects unknown email with 401 INVALID_CREDENTIALS', async () => {
     const res = await request(app)
       .post('/api/v1/auth/login')
@@ -72,6 +83,58 @@ describe('MediConnect Backend API & Safety Safeguards Integration Tests', () => 
     assert.equal(res.body.error, 'ACCOUNT_INACTIVE');
   });
 
+  test('Audit logging: records unknown-user failed login with NULL actor_user_id (no FK violation)', async () => {
+    await request(app)
+      .post('/api/v1/auth/login')
+      .send({ email: 'ghost.user.audit@nowhere.com', password: 'Password@123' });
+
+    const logs = await AuditLogsRepository.listAll();
+    const failedLog = logs.find(l => {
+      const details = typeof l.details === 'string' ? JSON.parse(l.details) : l.details;
+      return l.event_type === 'LOGIN_FAILED' && details.attemptedEmail === 'ghost.user.audit@nowhere.com';
+    });
+
+    assert.ok(failedLog, 'Expected failed login audit record to be created');
+    assert.equal(failedLog.actor_user_id, null, 'Unauthenticated actor_user_id must be NULL, never nonexistent string');
+    assert.equal(failedLog.actor_role, 'anonymous');
+  });
+
+  test('Audit logging: records incorrect-password failed login with valid actor_user_id', async () => {
+    await request(app)
+      .post('/api/v1/auth/login')
+      .send({ email: 'staff.rohit@mediconnect.local', password: 'IncorrectPassword1!' });
+
+    const logs = await AuditLogsRepository.listAll();
+    const pwFailLog = logs.find(l => {
+      const details = typeof l.details === 'string' ? JSON.parse(l.details) : l.details;
+      return l.event_type === 'LOGIN_FAILED' && details.reason === 'Password mismatch' && details.email === 'staff.rohit@mediconnect.local';
+    });
+
+    assert.ok(pwFailLog, 'Expected password mismatch audit record');
+    assert.equal(pwFailLog.actor_user_id, 'USR-BBS-001', 'Seeded user ID must be preserved for existing user');
+    assert.equal(pwFailLog.actor_role, 'blood_bank_staff');
+  });
+
+  test('Audit logging: direct record handles both NULL and legacy ANONYMOUS safely', async () => {
+    const record1 = await AuditLogsRepository.record({
+      eventType: 'SECURITY_EVENT_NULL',
+      recordId: 'SEC-001',
+      actorUserId: null,
+      actorRole: 'anonymous',
+      details: { note: 'Direct null actor' }
+    });
+    assert.equal(record1.actor_user_id, null);
+
+    const record2 = await AuditLogsRepository.record({
+      eventType: 'SECURITY_EVENT_ANON_STRING',
+      recordId: 'SEC-002',
+      actorUserId: 'ANONYMOUS', // Legacy string normalized to null
+      actorRole: 'anonymous',
+      details: { note: 'Legacy string sanitized to null' }
+    });
+    assert.equal(record2.actor_user_id, null);
+  });
+
   test('GET /api/v1/auth/me returns profile for authenticated user', async () => {
     const res = await request(app)
       .get('/api/v1/auth/me')
@@ -79,6 +142,20 @@ describe('MediConnect Backend API & Safety Safeguards Integration Tests', () => 
 
     assert.equal(res.status, 200);
     assert.equal(res.body.user.role, 'clinical_reviewer');
+  });
+
+  test('CORS: allows configured origins (http://localhost:3000 and 5173)', async () => {
+    const res3000 = await request(app)
+      .get('/health')
+      .set('Origin', 'http://localhost:3000');
+    assert.equal(res3000.status, 200);
+    assert.equal(res3000.headers['access-control-allow-origin'], 'http://localhost:3000');
+
+    const res5173 = await request(app)
+      .get('/health')
+      .set('Origin', 'http://localhost:5173');
+    assert.equal(res5173.status, 200);
+    assert.equal(res5173.headers['access-control-allow-origin'], 'http://localhost:5173');
   });
 
   test('POST /api/v1/blood-safety/assessments evaluates DGHS vitals on server with staffToken', async () => {

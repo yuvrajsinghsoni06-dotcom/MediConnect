@@ -10,7 +10,7 @@ import { validateBody } from '../middleware/validator.js';
 const router = express.Router();
 
 const loginSchema = z.object({
-  email: z.string().email({ message: 'Valid email address is required' }),
+  email: z.string().trim().email({ message: 'Valid email address is required' }),
   password: z.string().min(1, { message: 'Password is required' })
 });
 
@@ -35,18 +35,20 @@ router.get('/demo-users', (req, res) => {
 
 router.post('/login', validateBody(loginSchema), async (req, res, next) => {
   try {
-    const { email, password } = req.body;
+    const email = (req.body.email || '').toLowerCase().trim();
+    const { password } = req.body;
     const user = await UsersRepository.findByEmail(email);
 
     if (!user) {
+      // Unauthenticated security event: actorUserId is explicitly NULL to comply with foreign key constraints
       await AuditLogsRepository.record({
         eventType: 'LOGIN_FAILED',
         recordId: 'UNKNOWN_USER',
         entityType: 'users',
-        actorUserId: 'ANONYMOUS',
+        actorUserId: null,
         actorRole: 'anonymous',
         ipAddress: req.ip,
-        details: { email, reason: 'User not found' }
+        details: { attemptedEmail: email, reason: 'User not found' }
       });
 
       return res.status(401).json({

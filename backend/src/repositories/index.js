@@ -2,7 +2,7 @@ import { query, withTransaction, isDbConnected } from '../config/db.js';
 import { MANDATORY_SCREENING_CODES, verifyReleasePrerequisites } from '../services/safetySafeguards.js';
 
 // Synthetic in-memory fallback datasets (mirroring 001_synthetic_seed_data.sql)
-const BCRYPT_HASH_PASSWORD_123 = '$2a$10$OxKNZP3xKVhkJGmZryepFuuwloe7hE1TwLzapdzPOAqYbVU6z.4Am';
+const BCRYPT_HASH_PASSWORD_123 = '$2a$10$IxLWtwcFXlOtFl4SKpaoteAdQg6doSBkP/P.aAguW06ZYw4quP7/K';
 
 let memoryStore = {
   users: [
@@ -73,11 +73,12 @@ export function resetMemoryStore() {
 
 export const UsersRepository = {
   async findByEmail(email) {
+    const normalized = (email || '').toLowerCase().trim();
     if (isDbConnected()) {
-      const rows = await query('SELECT * FROM users WHERE email = ?', [email]);
+      const rows = await query('SELECT * FROM users WHERE LOWER(email) = ?', [normalized]);
       return rows[0] || null;
     }
-    return memoryStore.users.find(u => u.email.toLowerCase() === email.toLowerCase()) || null;
+    return memoryStore.users.find(u => u.email.toLowerCase() === normalized) || null;
   },
 
   async findByUserId(userId) {
@@ -609,13 +610,22 @@ export const AuditLogsRepository = {
 
   async record(entry) {
     const logId = `LOG-${Date.now().toString(36).toUpperCase()}-${Math.floor(Math.random() * 1000)}`;
+    
+    // Normalize actor_user_id: Unauthenticated events (e.g. unknown login attempts)
+    // MUST NOT reference nonexistent IDs such as 'ANONYMOUS'.
+    // They are stored with actor_user_id = null to respect foreign-key constraints.
+    let actorUserId = entry.actorUserId;
+    if (!actorUserId || actorUserId === 'ANONYMOUS' || actorUserId === 'UNKNOWN_USER' || actorUserId === 'ANON') {
+      actorUserId = null;
+    }
+
     const logRecord = {
       log_id: logId,
       event_type: entry.eventType,
       record_id: entry.recordId,
       entity_type: entry.entityType || 'blood_safety',
-      actor_user_id: entry.actorUserId,
-      actor_role: entry.actorRole,
+      actor_user_id: actorUserId,
+      actor_role: entry.actorRole || 'anonymous',
       ip_address: entry.ipAddress || '127.0.0.1',
       details: typeof entry.details === 'object' ? JSON.stringify(entry.details) : String(entry.details)
     };
@@ -628,7 +638,7 @@ export const AuditLogsRepository = {
           [logRecord.log_id, logRecord.event_type, logRecord.record_id, logRecord.entity_type, logRecord.actor_user_id, logRecord.actor_role, logRecord.ip_address, logRecord.details]
         );
       } catch (err) {
-        console.error('[AUDIT] Failed to insert audit log into MySQL:', err.message);
+        console.error('[AUDIT_ERROR] Failed to insert audit log into MySQL:', err.message);
       }
     }
 
