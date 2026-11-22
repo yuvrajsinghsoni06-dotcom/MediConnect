@@ -8,7 +8,9 @@ import {
   FollowUpsRepository,
   AuditLogsRepository,
   DonorsRepository,
-  StatsRepository
+  StatsRepository,
+  DeferralsRepository,
+  CatalogueRepository
 } from '../repositories/index.js';
 import {
   evaluateDonorVitals,
@@ -32,6 +34,98 @@ router.get('/statistics', async (req, res, next) => {
     next(err);
   }
 });
+
+// Screening Test Master Catalogue
+router.get('/catalogue', async (req, res, next) => {
+  try {
+    const list = await CatalogueRepository.listAll();
+    res.json({ success: true, data: list });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.put(
+  '/catalogue/:testCode',
+  authenticateToken,
+  requireRole('admin'),
+  async (req, res, next) => {
+    try {
+      const updated = await CatalogueRepository.update(req.params.testCode, req.body);
+      await AuditLogsRepository.record({
+        eventType: 'CATALOGUE_PROTOCOL_UPDATED',
+        recordId: req.params.testCode,
+        entityType: 'screening_test_catalogue',
+        actorUserId: req.user.userId,
+        actorRole: req.user.role,
+        ipAddress: req.ip,
+        details: req.body
+      });
+      res.json({ success: true, data: updated });
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
+// Donor Deferrals Registry
+router.get(
+  '/deferrals',
+  authenticateToken,
+  requireRole('blood_bank_staff', 'clinical_reviewer', 'admin'),
+  async (req, res, next) => {
+    try {
+      const list = await DeferralsRepository.listAll();
+      res.json({ success: true, data: list });
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
+const deferralSchema = z.object({
+  donor_id: z.string().min(1),
+  assessment_id: z.string().optional().nullable(),
+  type: z.enum(['Temporary', 'Permanent']),
+  category: z.enum(['Low_Hemoglobin', 'Underweight', 'Hypertension', 'Travel_Risk', 'TTI_Positive', 'Medical_Condition', 'Other']),
+  reason: z.string().min(3),
+  start_date: z.string().optional(),
+  end_date: z.string().optional().nullable()
+});
+
+router.post(
+  '/deferrals',
+  authenticateToken,
+  requireRole('blood_bank_staff', 'clinical_reviewer', 'admin'),
+  validateBody(deferralSchema),
+  async (req, res, next) => {
+    try {
+      const record = await DeferralsRepository.create({
+        ...req.body,
+        authorized_by_user_id: req.user.userId
+      });
+
+      await AuditLogsRepository.record({
+        eventType: 'DONOR_DEFERRAL_REGISTERED',
+        recordId: record.deferral_id,
+        entityType: 'donor_deferrals',
+        actorUserId: req.user.userId,
+        actorRole: req.user.role,
+        ipAddress: req.ip,
+        details: {
+          donor_id: req.body.donor_id,
+          type: req.body.type,
+          category: req.body.category,
+          reason: req.body.reason
+        }
+      });
+
+      res.status(201).json({ success: true, data: record });
+    } catch (err) {
+      next(err);
+    }
+  }
+);
 
 // ============================================================================
 // 1. DONOR ASSESSMENTS

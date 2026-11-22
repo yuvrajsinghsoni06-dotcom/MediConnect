@@ -57,6 +57,12 @@ let memoryStore = {
     { id: 1, campaign_id: 'CMP-2026-01', title: 'AIIMS Blood Donation Drive', organizer: 'Rotary Club Delhi & AIIMS', location: 'AIIMS Main Auditorium, New Delhi', date: '2026-02-15', start_time: '09:00:00', end_time: '17:00:00', target_units: 150, collected_units: 42, status: 'Upcoming', description: 'Annual community blood collection camp.' },
     { id: 2, campaign_id: 'CMP-2026-02', title: 'Red Cross Youth Camp', organizer: 'Indian Red Cross Society', location: 'Town Hall Grounds, Connaught Place', date: '2026-02-28', start_time: '10:00:00', end_time: '16:00:00', target_units: 100, collected_units: 0, status: 'Upcoming', description: 'Youth-oriented voluntary blood drive.' }
   ],
+  deferrals: [
+    { id: 1, deferral_id: 'DEF-2026-001', donor_id: 'DNR-2026-001', assessment_id: 'ASM-2026-003', type: 'Temporary', category: 'Low_Hemoglobin', reason: 'Hemoglobin 11.2 g/dL below DGHS 12.5 g/dL statutory threshold', start_date: '2026-01-15', end_date: '2026-04-15', authorized_by_user_id: 'USR-BBS-001', created_at: '2026-01-15T10:00:00Z' }
+  ],
+  components: [
+    { id: 1, component_code: 'PRBC-2026-0619', unit_number: 'DON-2026-0619', component_type: 'Packed Red Blood Cells', volume_ml: 280, storage_temperature_c: '2-6°C', storage_location: 'Cold Room B - Shelf 3', status: 'Released', expiry_date: '2026-02-21' }
+  ],
   emergencyRequests: [
     { id: 1, request_id: 'EMG-2026-01', hospital_name: 'Apollo Hospital Trauma ICU', coordinator_user_id: 'USR-HSP-001', blood_group: 'O+', units_needed: 4, urgency: 'Critical', contact_person: 'Dr. Vikram Seth', contact_phone: '+91 98765 11223', status: 'In_Progress' },
     { id: 2, request_id: 'EMG-2026-02', hospital_name: 'Max Healthcare Cardiac OT', coordinator_user_id: null, blood_group: 'AB-', units_needed: 2, urgency: 'Urgent', contact_person: 'Nurse Supervisor Deepa', contact_phone: '+91 98111 44556', status: 'Open' }
@@ -87,6 +93,50 @@ export const UsersRepository = {
       return rows[0] || null;
     }
     return memoryStore.users.find(u => u.user_id === userId) || null;
+  },
+
+  async create(userData) {
+    const userId = userData.user_id || `USR-DNR-${Date.now().toString(36).toUpperCase()}-${Math.floor(100 + Math.random() * 900)}`;
+    const role = userData.role || 'donor';
+    const department = userData.department || 'Community Donors';
+    const isActive = userData.is_active !== undefined ? userData.is_active : 1;
+    const normalizedEmail = (userData.email || '').toLowerCase().trim();
+
+    if (isDbConnected()) {
+      await query(
+        `INSERT INTO users (user_id, name, email, password_hash, role, department, is_active)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        [userId, userData.name, normalizedEmail, userData.password_hash, role, department, isActive]
+      );
+      return await this.findByUserId(userId);
+    }
+
+    const newUser = {
+      id: memoryStore.users.length + 1,
+      user_id: userId,
+      name: userData.name,
+      email: normalizedEmail,
+      password_hash: userData.password_hash,
+      role,
+      department,
+      is_active: isActive ? 1 : 0
+    };
+    memoryStore.users.push(newUser);
+    return newUser;
+  },
+
+  async update(userId, data) {
+    if (isDbConnected()) {
+      if (data.name) {
+        await query('UPDATE users SET name = ? WHERE user_id = ?', [data.name, userId]);
+      }
+      return await this.findByUserId(userId);
+    }
+    const user = memoryStore.users.find(u => u.user_id === userId);
+    if (user && data.name) {
+      user.name = data.name;
+    }
+    return user || null;
   }
 };
 
@@ -170,6 +220,41 @@ export const DonorsRepository = {
     const newDonor = { id: memoryStore.donors.length + 1, ...data, total_donations: 0, last_donation_date: null };
     memoryStore.donors.push(newDonor);
     return newDonor;
+  },
+
+  async findByUserId(userId) {
+    if (isDbConnected()) {
+      const rows = await query('SELECT * FROM donors WHERE user_id = ?', [userId]);
+      return rows[0] || null;
+    }
+    return memoryStore.donors.find(d => d.user_id === userId) || null;
+  },
+
+  async update(donorId, data) {
+    if (isDbConnected()) {
+      await query(
+        `UPDATE donors 
+         SET full_name = ?, blood_group = ?, date_of_birth = ?, gender = ?, phone = ?, city = ?, state = ?
+         WHERE donor_id = ?`,
+        [data.full_name, data.blood_group, data.date_of_birth, data.gender, data.phone, data.city, data.state, donorId]
+      );
+      return await this.findById(donorId);
+    }
+    const donor = memoryStore.donors.find(d => d.donor_id === donorId);
+    if (donor) {
+      Object.assign(donor, data);
+    }
+    return donor || null;
+  },
+
+  async getDonationHistory(donorId) {
+    if (isDbConnected()) {
+      return await query(
+        'SELECT * FROM blood_donations WHERE donor_id = ? ORDER BY donation_date DESC',
+        [donorId]
+      );
+    }
+    return (memoryStore.donations || []).filter(d => d.donor_id === donorId);
   }
 };
 
@@ -582,12 +667,266 @@ export const FollowUpsRepository = {
   }
 };
 
+export const DeferralsRepository = {
+  async listAll() {
+    if (isDbConnected()) {
+      return await query(`
+        SELECT d.*, dn.full_name, dn.blood_group 
+        FROM donor_deferrals d
+        LEFT JOIN donors dn ON d.donor_id = dn.donor_id
+        ORDER BY d.created_at DESC
+      `);
+    }
+    return memoryStore.deferrals || [];
+  },
+
+  async findByDonorId(donorId) {
+    if (isDbConnected()) {
+      return await query('SELECT * FROM donor_deferrals WHERE donor_id = ? ORDER BY created_at DESC', [donorId]);
+    }
+    return (memoryStore.deferrals || []).filter(d => d.donor_id === donorId);
+  },
+
+  async create(data) {
+    const deferralId = `DEF-2026-${Math.floor(100 + Math.random() * 900)}`;
+    const record = {
+      deferral_id: deferralId,
+      donor_id: data.donor_id,
+      assessment_id: data.assessment_id || null,
+      type: data.type || 'Temporary',
+      category: data.category || 'Other',
+      reason: data.reason,
+      start_date: data.start_date || new Date().toISOString().split('T')[0],
+      end_date: data.end_date || null,
+      authorized_by_user_id: data.authorized_by_user_id
+    };
+
+    if (isDbConnected()) {
+      await query(
+        `INSERT INTO donor_deferrals (deferral_id, donor_id, assessment_id, type, category, reason, start_date, end_date, authorized_by_user_id)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [record.deferral_id, record.donor_id, record.assessment_id, record.type, record.category, record.reason, record.start_date, record.end_date, record.authorized_by_user_id]
+      );
+    }
+    return record;
+  }
+};
+
+export const CatalogueRepository = {
+  async listAll() {
+    if (isDbConnected()) {
+      return await query('SELECT * FROM screening_test_catalogue ORDER BY id ASC');
+    }
+    return [
+      { id: 1, test_code: 'HIV', test_name: 'HIV-1/2 4th Gen Ag/Ab Combo', category: 'TTI_Serology', methodology: 'Chemiluminescent Microparticle Immunoassay (CMIA)', is_mandatory_for_release: 1, expected_negative_value: 'Non-Reactive' },
+      { id: 2, test_code: 'HBSAG', test_name: 'Hepatitis B Surface Antigen (HBsAg)', category: 'TTI_Serology', methodology: 'Chemiluminescence Immunoassay (CLIA)', is_mandatory_for_release: 1, expected_negative_value: 'Non-Reactive' },
+      { id: 3, test_code: 'HCV', test_name: 'Hepatitis C Virus Antibody (Anti-HCV)', category: 'TTI_Serology', methodology: '3rd Gen Microplate ELISA', is_mandatory_for_release: 1, expected_negative_value: 'Non-Reactive' },
+      { id: 4, test_code: 'SYPHILIS', test_name: 'Treponema pallidum Hemagglutination (TPHA)', category: 'TTI_Serology', methodology: 'TPHA / RPR Syphilis Screen', is_mandatory_for_release: 1, expected_negative_value: 'Non-Reactive' },
+      { id: 5, test_code: 'MALARIA', test_name: 'Malaria Parasite Antigen (Pan/Pf)', category: 'TTI_Serology', methodology: 'Rapid Immunochromatographic Strip & Blood Smear', is_mandatory_for_release: 1, expected_negative_value: 'Non-Reactive' },
+      { id: 6, test_code: 'ABO_RH', test_name: 'Blood Group & Rh(D) Confirmation', category: 'Immunohematology', methodology: 'Forward & Reverse Tube Agglutination', is_mandatory_for_release: 1, expected_negative_value: 'Confirmed' }
+    ];
+  },
+
+  async update(testCode, updates) {
+    if (isDbConnected()) {
+      const fields = [];
+      const values = [];
+      if (updates.is_mandatory_for_release !== undefined) {
+        fields.push('is_mandatory_for_release = ?');
+        values.push(updates.is_mandatory_for_release ? 1 : 0);
+      }
+      if (updates.methodology !== undefined) {
+        fields.push('methodology = ?');
+        values.push(updates.methodology);
+      }
+      if (fields.length > 0) {
+        values.push(testCode);
+        await query(`UPDATE screening_test_catalogue SET ${fields.join(', ')} WHERE test_code = ?`, values);
+      }
+      const rows = await query('SELECT * FROM screening_test_catalogue WHERE test_code = ?', [testCode]);
+      return rows[0] || null;
+    }
+    return null;
+  }
+};
+
+export const ComponentsRepository = {
+  async listAll(filters = {}) {
+    if (isDbConnected()) {
+      let sql = `
+        SELECT c.*, bd.blood_group, bd.donation_date, bd.location
+        FROM blood_components c
+        JOIN blood_donations bd ON c.unit_number = bd.unit_number
+        WHERE 1=1
+      `;
+      const params = [];
+      if (filters.status) {
+        sql += ' AND c.status = ?';
+        params.push(filters.status);
+      }
+      if (filters.component_type) {
+        sql += ' AND c.component_type = ?';
+        params.push(filters.component_type);
+      }
+      if (filters.blood_group) {
+        sql += ' AND bd.blood_group = ?';
+        params.push(filters.blood_group);
+      }
+      sql += ' ORDER BY c.expiry_date ASC';
+      return await query(sql, params);
+    }
+    return [];
+  },
+
+  async findByCode(componentCode) {
+    if (isDbConnected()) {
+      const rows = await query(`
+        SELECT c.*, bd.blood_group, bd.donation_date, bd.location
+        FROM blood_components c
+        JOIN blood_donations bd ON c.unit_number = bd.unit_number
+        WHERE c.component_code = ?
+      `, [componentCode]);
+      return rows[0] || null;
+    }
+    return null;
+  },
+
+  async getInventorySummary() {
+    if (isDbConnected()) {
+      const summary = await query(`
+        SELECT 
+          bd.blood_group,
+          c.component_type,
+          c.status,
+          COUNT(*) as unit_count,
+          SUM(c.volume_ml) as total_volume_ml
+        FROM blood_components c
+        JOIN blood_donations bd ON c.unit_number = bd.unit_number
+        GROUP BY bd.blood_group, c.component_type, c.status
+      `);
+
+      const [[{ releasedTotal }]] = await query(`SELECT COUNT(*) as releasedTotal FROM blood_components WHERE status = 'Released'`);
+      const [[{ quarantinedTotal }]] = await query(`SELECT COUNT(*) as quarantinedTotal FROM blood_components WHERE status = 'Quarantined'`);
+      const [[{ transfusedTotal }]] = await query(`SELECT COUNT(*) as transfusedTotal FROM blood_components WHERE status = 'Transfused'`);
+      const [[{ discardedTotal }]] = await query(`SELECT COUNT(*) as discardedTotal FROM blood_components WHERE status = 'Discarded'`);
+      const [[{ expiringSoon }]] = await query(`
+        SELECT COUNT(*) as expiringSoon 
+        FROM blood_components 
+        WHERE status = 'Released' AND expiry_date BETWEEN NOW() AND DATE_ADD(NOW(), INTERVAL 5 DAY)
+      `);
+
+      return {
+        breakdown: summary,
+        totals: {
+          released: Number(releasedTotal || 0),
+          quarantined: Number(quarantinedTotal || 0),
+          transfused: Number(transfusedTotal || 0),
+          discarded: Number(discardedTotal || 0),
+          expiringSoon: Number(expiringSoon || 0)
+        }
+      };
+    }
+    return { breakdown: [], totals: { released: 8, quarantined: 2, transfused: 0, discarded: 0, expiringSoon: 2 } };
+  },
+
+  async create(data) {
+    const code = data.component_code || `CMP-${Date.now().toString(36).toUpperCase()}`;
+    const record = {
+      component_code: code,
+      unit_number: data.unit_number,
+      component_type: data.component_type,
+      volume_ml: data.volume_ml,
+      storage_temperature_c: data.storage_temperature_c || '2-6°C',
+      storage_location: data.storage_location || 'Cold Room Reserve',
+      preparation_timestamp: data.preparation_timestamp || new Date().toISOString().slice(0, 19).replace('T', ' '),
+      expiry_date: data.expiry_date,
+      status: data.status || 'Quarantined'
+    };
+    if (isDbConnected()) {
+      await query(
+        `INSERT INTO blood_components (component_code, unit_number, component_type, volume_ml, storage_temperature_c, storage_location, preparation_timestamp, expiry_date, status)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [record.component_code, record.unit_number, record.component_type, record.volume_ml, record.storage_temperature_c, record.storage_location, record.preparation_timestamp, record.expiry_date, record.status]
+      );
+    }
+    if (!memoryStore.components) memoryStore.components = [];
+    memoryStore.components.push(record);
+    return record;
+  },
+
+  async updateStatus(componentCode, status) {
+    if (isDbConnected()) {
+      await query('UPDATE blood_components SET status = ? WHERE component_code = ?', [status, componentCode]);
+      return await this.findByCode(componentCode);
+    }
+    const item = (memoryStore.components || []).find(c => c.component_code === componentCode);
+    if (item) {
+      item.status = status;
+      return item;
+    }
+    return null;
+  }
+};
+
 export const CampaignsRepository = {
   async listAll() {
     if (isDbConnected()) {
       return await query('SELECT * FROM campaigns ORDER BY date ASC');
     }
     return memoryStore.campaigns;
+  },
+
+  async create(data) {
+    const campaignId = `CMP-2026-${Math.floor(100 + Math.random() * 900)}`;
+    const record = {
+      campaign_id: campaignId,
+      title: data.title,
+      organizer: data.organizer,
+      location: data.location,
+      date: data.date,
+      start_time: data.start_time || '09:00:00',
+      end_time: data.end_time || '17:00:00',
+      target_units: data.target_units || 100,
+      collected_units: data.collected_units || 0,
+      status: data.status || 'Upcoming',
+      description: data.description || null
+    };
+
+    if (isDbConnected()) {
+      await query(
+        `INSERT INTO campaigns (campaign_id, title, organizer, location, date, start_time, end_time, target_units, collected_units, status, description)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [record.campaign_id, record.title, record.organizer, record.location, record.date, record.start_time, record.end_time, record.target_units, record.collected_units, record.status, record.description]
+      );
+    }
+    if (!memoryStore.campaigns) memoryStore.campaigns = [];
+    memoryStore.campaigns.push(record);
+    return record;
+  },
+
+  async update(campaignId, data) {
+    if (isDbConnected()) {
+      const fields = [];
+      const values = [];
+      ['title', 'organizer', 'location', 'date', 'start_time', 'end_time', 'target_units', 'collected_units', 'status', 'description'].forEach(field => {
+        if (data[field] !== undefined) {
+          fields.push(`\`${field}\` = ?`);
+          values.push(data[field]);
+        }
+      });
+      if (fields.length > 0) {
+        values.push(campaignId);
+        await query(`UPDATE campaigns SET ${fields.join(', ')} WHERE campaign_id = ?`, values);
+      }
+      const rows = await query('SELECT * FROM campaigns WHERE campaign_id = ?', [campaignId]);
+      return rows[0] || null;
+    }
+    const item = (memoryStore.campaigns || []).find(c => c.campaign_id === campaignId);
+    if (item) {
+      Object.assign(item, data);
+      return item;
+    }
+    return null;
   }
 };
 
@@ -597,6 +936,120 @@ export const EmergencyRequestsRepository = {
       return await query('SELECT * FROM emergency_requests ORDER BY created_at DESC');
     }
     return memoryStore.emergencyRequests;
+  },
+
+  async listMatching(bloodGroup) {
+    if (isDbConnected()) {
+      if (!bloodGroup) {
+        return await query('SELECT * FROM emergency_requests WHERE status IN ("Open", "In_Progress") ORDER BY created_at DESC LIMIT 6');
+      }
+      return await query(
+        'SELECT * FROM emergency_requests WHERE (blood_group = ? OR blood_group = "O-") AND status IN ("Open", "In_Progress") ORDER BY created_at DESC LIMIT 6',
+        [bloodGroup]
+      );
+    }
+    return (memoryStore.emergencyRequests || []).filter(r => !bloodGroup || r.blood_group === bloodGroup || r.blood_group === 'O-');
+  },
+
+  async create(data) {
+    const requestId = `EMG-2026-${Math.floor(100 + Math.random() * 900)}`;
+    const record = {
+      request_id: requestId,
+      hospital_name: data.hospital_name,
+      coordinator_user_id: data.coordinator_user_id || null,
+      blood_group: data.blood_group,
+      units_needed: data.units_needed,
+      urgency: data.urgency || 'Urgent',
+      contact_person: data.contact_person,
+      contact_phone: data.contact_phone,
+      status: data.status || 'Open'
+    };
+
+    if (isDbConnected()) {
+      await query(
+        `INSERT INTO emergency_requests (request_id, hospital_name, coordinator_user_id, blood_group, units_needed, urgency, contact_person, contact_phone, status)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [record.request_id, record.hospital_name, record.coordinator_user_id, record.blood_group, record.units_needed, record.urgency, record.contact_person, record.contact_phone, record.status]
+      );
+    }
+    if (!memoryStore.emergencyRequests) memoryStore.emergencyRequests = [];
+    memoryStore.emergencyRequests.push(record);
+    return record;
+  },
+
+  async updateStatus(requestId, status) {
+    if (isDbConnected()) {
+      await query('UPDATE emergency_requests SET status = ? WHERE request_id = ?', [status, requestId]);
+      const rows = await query('SELECT * FROM emergency_requests WHERE request_id = ?', [requestId]);
+      return rows[0] || null;
+    }
+    const item = (memoryStore.emergencyRequests || []).find(r => r.request_id === requestId);
+    if (item) {
+      item.status = status;
+      return item;
+    }
+    return null;
+  }
+};
+
+export const ReportsRepository = {
+  async getAnalyticsSummary() {
+    if (isDbConnected()) {
+      // Monthly donation trends
+      const monthlyDonations = await query(`
+        SELECT 
+          DATE_FORMAT(donation_date, '%Y-%m') as month,
+          blood_group,
+          COUNT(*) as count,
+          SUM(volume_ml) as total_volume_ml
+        FROM blood_donations
+        GROUP BY DATE_FORMAT(donation_date, '%Y-%m'), blood_group
+        ORDER BY month DESC
+      `);
+
+      // Lab test outcomes breakdown
+      const labOutcomes = await query(`
+        SELECT 
+          test_code,
+          result,
+          COUNT(*) as count
+        FROM laboratory_test_results
+        GROUP BY test_code, result
+      `);
+
+      // Deferrals breakdown by category
+      const deferralsByCategory = await query(`
+        SELECT category, type, COUNT(*) as count
+        FROM donor_deferrals
+        GROUP BY category, type
+      `);
+
+      // Emergency requests fulfillment rate
+      const emergencyStats = await query(`
+        SELECT 
+          urgency,
+          status,
+          COUNT(*) as count,
+          SUM(units_needed) as total_units_needed
+        FROM emergency_requests
+        GROUP BY urgency, status
+      `);
+
+      return {
+        generatedAt: new Date().toISOString(),
+        monthlyDonations,
+        labOutcomes,
+        deferralsByCategory,
+        emergencyStats
+      };
+    }
+    return {
+      generatedAt: new Date().toISOString(),
+      monthlyDonations: [],
+      labOutcomes: [],
+      deferralsByCategory: [],
+      emergencyStats: []
+    };
   }
 };
 

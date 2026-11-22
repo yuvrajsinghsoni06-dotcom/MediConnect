@@ -7,6 +7,9 @@ import { isDbConnected } from './config/db.js';
 import authRoutes from './routes/authRoutes.js';
 import bloodSafetyRoutes from './routes/bloodSafetyRoutes.js';
 import generalRoutes from './routes/generalRoutes.js';
+import userRoutes from './routes/userRoutes.js';
+import inventoryRoutes from './routes/inventoryRoutes.js';
+import reportRoutes from './routes/reportRoutes.js';
 import { errorHandler } from './middleware/errorHandler.js';
 
 const app = express();
@@ -54,7 +57,10 @@ const apiRouters = [config.apiPrefix, '/api'];
 
 apiRouters.forEach(prefix => {
   app.use(`${prefix}/auth`, authRoutes);
+  app.use(`${prefix}/users`, userRoutes);
   app.use(`${prefix}/blood-safety`, bloodSafetyRoutes);
+  app.use(`${prefix}/inventory`, inventoryRoutes);
+  app.use(`${prefix}/reports`, reportRoutes);
   app.use(`${prefix}`, generalRoutes);
 });
 

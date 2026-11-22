@@ -1,10 +1,14 @@
 import http from 'http';
 import app from '../src/app.js';
+import { testConnection } from '../src/config/db.js';
 
 const PORT = 5055; // dedicated verification port
 
 async function runStartupVerification() {
   console.log('[STARTUP CHECK] Testing MediConnect backend server startup...');
+
+  // 0. Verify MySQL connectivity
+  await testConnection();
 
   const server = http.createServer(app);
 
@@ -107,6 +111,30 @@ async function runStartupVerification() {
       throw new Error(`Unknown email rejection failed: ${JSON.stringify(unknownRes.data)}`);
     }
     console.log('[STARTUP CHECK] ✅ Unknown email rejection verified (401 INVALID_CREDENTIALS)');
+
+    // 5b. New User Registration & Login Workflow
+    const newTestEmail = `startup.test.${Date.now()}@mediconnect.local`;
+    const regRes = await makeRequest('/api/v1/auth/register', 'POST', {
+      name: 'Startup Test Citizen',
+      email: newTestEmail,
+      password: 'MyPassword@2026',
+      phoneNumber: '9876543210',
+      city: 'Delhi',
+      bloodGroup: 'O+'
+    });
+    if (regRes.status !== 201 || !regRes.data.token || regRes.data.user.role !== 'donor') {
+      throw new Error(`User registration failed: ${JSON.stringify(regRes.data)}`);
+    }
+    console.log('[STARTUP CHECK] ✅ Live user registration verified (201 Created, Role: donor)');
+
+    const newLoginRes = await makeRequest('/api/v1/auth/login', 'POST', {
+      email: newTestEmail,
+      password: 'MyPassword@2026'
+    });
+    if (newLoginRes.status !== 200 || !newLoginRes.data.token) {
+      throw new Error(`Newly registered user login failed: ${JSON.stringify(newLoginRes.data)}`);
+    }
+    console.log('[STARTUP CHECK] ✅ Newly registered user login verified (200 OK, authenticated)');
 
     // 6. Donor privacy test
     const donorsRes = await makeRequest('/api/v1/donors');

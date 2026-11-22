@@ -2,7 +2,7 @@ import { test, describe, before } from 'node:test';
 import assert from 'node:assert/strict';
 import request from 'supertest';
 import app from '../src/app.js';
-import { AuditLogsRepository } from '../src/repositories/index.js';
+import { AuditLogsRepository, UsersRepository } from '../src/repositories/index.js';
 
 describe('MediConnect Backend API & Safety Safeguards Integration Tests', () => {
   let adminToken;
@@ -44,6 +44,98 @@ describe('MediConnect Backend API & Safety Safeguards Integration Tests', () => 
     assert.ok(tmoToken);
     assert.ok(donorToken);
     assert.ok(hospitalToken);
+  });
+
+  test('POST /api/v1/auth/register creates a new user account with role donor and hashed password', async () => {
+    const uniqueEmail = `test.user.${Date.now()}@example.com`;
+    const res = await request(app)
+      .post('/api/v1/auth/register')
+      .send({
+        name: 'New Registered User',
+        email: uniqueEmail,
+        password: 'SecurePassword123!',
+        phoneNumber: '9876543210',
+        city: 'Mumbai',
+        bloodGroup: 'O+'
+      });
+
+    assert.equal(res.status, 201);
+    assert.ok(res.body.token);
+    assert.equal(res.body.user.role, 'donor');
+    assert.equal(res.body.user.name, 'New Registered User');
+    assert.equal(res.body.user.email, uniqueEmail);
+
+    // Verify user can immediately log in with exact email and password
+    const loginRes = await request(app)
+      .post('/api/v1/auth/login')
+      .send({
+        email: uniqueEmail,
+        password: 'SecurePassword123!'
+      });
+
+    assert.equal(loginRes.status, 200);
+    assert.ok(loginRes.body.token);
+    assert.equal(loginRes.body.user.role, 'donor');
+
+    // Verify stored password in repository is hashed, not plain text
+    const storedUser = await UsersRepository.findByEmail(uniqueEmail);
+    assert.ok(storedUser);
+    assert.notEqual(storedUser.password_hash, 'SecurePassword123!');
+    assert.ok(storedUser.password_hash.startsWith('$2'));
+  });
+
+  test('POST /api/v1/auth/register rejects duplicate email with 409 EMAIL_ALREADY_EXISTS', async () => {
+    const res = await request(app)
+      .post('/api/v1/auth/register')
+      .send({
+        name: 'Duplicate Admin Attempt',
+        email: 'admin@mediconnect.local',
+        password: 'Password@123'
+      });
+
+    assert.equal(res.status, 409);
+    assert.equal(res.body.error, 'EMAIL_ALREADY_EXISTS');
+  });
+
+  test('POST /api/v1/auth/register rejects weak password with 400 validation error', async () => {
+    const res = await request(app)
+      .post('/api/v1/auth/register')
+      .send({
+        name: 'Weak Password User',
+        email: 'weak.pw@example.com',
+        password: 'short'
+      });
+
+    assert.equal(res.status, 400);
+    assert.equal(res.body.error, 'VALIDATION_FAILED');
+  });
+
+  test('POST /api/v1/auth/register rejects invalid email format with 400 validation error', async () => {
+    const res = await request(app)
+      .post('/api/v1/auth/register')
+      .send({
+        name: 'Invalid Email User',
+        email: 'not-an-email',
+        password: 'Password123!'
+      });
+
+    assert.equal(res.status, 400);
+    assert.equal(res.body.error, 'VALIDATION_FAILED');
+  });
+
+  test('POST /api/v1/auth/register ignores client-supplied privileged role and enforces donor', async () => {
+    const uniqueEmail = `malicious.admin.${Date.now()}@example.com`;
+    const res = await request(app)
+      .post('/api/v1/auth/register')
+      .send({
+        name: 'Sneaky User',
+        email: uniqueEmail,
+        password: 'Password123!',
+        role: 'admin'
+      });
+
+    assert.equal(res.status, 201);
+    assert.equal(res.body.user.role, 'donor');
   });
 
   test('POST /api/v1/auth/login normalizes email (case-insensitive and trimmed)', async () => {
@@ -359,5 +451,302 @@ describe('MediConnect Backend API & Safety Safeguards Integration Tests', () => 
     assert.ok(res.body.data.donations);
     assert.ok(res.body.data.tests);
     assert.equal(typeof res.body.data.activeFollowUps, 'number');
+  });
+
+  // Profile Management & Donor Onboarding Test Suite
+  test('GET /api/v1/users/profile returns 401 UNAUTHORIZED when no token is provided', async () => {
+    const res = await request(app).get('/api/v1/users/profile');
+    assert.equal(res.status, 401);
+  });
+
+  test('GET /api/v1/users/profile returns authenticated user and donor profile without exposing password', async () => {
+    const res = await request(app)
+      .get('/api/v1/users/profile')
+      .set('Authorization', `Bearer ${donorToken}`);
+
+    assert.equal(res.status, 200);
+    assert.ok(res.body.user);
+    assert.equal(res.body.user.email, 'rahul.donor@mediconnect.local');
+    assert.equal(res.body.user.password_hash, undefined, 'Password hash must NEVER be exposed');
+    assert.equal(res.body.user.password, undefined);
+    assert.ok(res.body.donorProfile);
+    assert.equal(res.body.donorProfile.blood_group, 'O+');
+    assert.equal(res.body.isOnboarded, true);
+    assert.ok(Array.isArray(res.body.donationHistory));
+  });
+
+  test('PUT /api/v1/users/profile updates permitted profile fields', async () => {
+    const res = await request(app)
+      .put('/api/v1/users/profile')
+      .set('Authorization', `Bearer ${donorToken}`)
+      .send({
+        name: 'Rahul Sharma (Updated)',
+        phone: '9876543219',
+        city: 'New Delhi'
+      });
+
+    assert.equal(res.status, 200);
+    assert.equal(res.body.user.name, 'Rahul Sharma (Updated)');
+    assert.equal(res.body.donorProfile.phone, '9876543219');
+  });
+
+  test('POST /api/v1/users/donor-onboarding completes donor profile for a new user', async () => {
+    // 1. Register a new donor user
+    const newEmail = `onboarding.donor.${Date.now()}@example.com`;
+    const regRes = await request(app)
+      .post('/api/v1/auth/register')
+      .send({
+        name: 'Fresh Donor',
+        email: newEmail,
+        password: 'Password@123'
+      });
+
+    assert.equal(regRes.status, 201);
+    const newToken = regRes.body.token;
+
+    // 2. Complete onboarding
+    const onboardRes = await request(app)
+      .post('/api/v1/users/donor-onboarding')
+      .set('Authorization', `Bearer ${newToken}`)
+      .send({
+        full_name: 'Fresh Donor Citizen',
+        blood_group: 'B+',
+        date_of_birth: '1996-08-20',
+        gender: 'Male',
+        phone: '9812345678',
+        city: 'Bengaluru',
+        state: 'Karnataka'
+      });
+
+    assert.equal(onboardRes.status, 200);
+    assert.ok(onboardRes.body.donorProfile);
+    assert.equal(onboardRes.body.donorProfile.blood_group, 'B+');
+    assert.equal(onboardRes.body.donorProfile.city, 'Bengaluru');
+
+    // 3. Repeat onboarding updates the same record without duplicate profiles
+    const repeatRes = await request(app)
+      .post('/api/v1/users/donor-onboarding')
+      .set('Authorization', `Bearer ${newToken}`)
+      .send({
+        full_name: 'Fresh Donor Citizen (Revised)',
+        blood_group: 'B+',
+        date_of_birth: '1996-08-20',
+        gender: 'Male',
+        phone: '9812345679',
+        city: 'Bengaluru',
+        state: 'Karnataka'
+      });
+
+    assert.equal(repeatRes.status, 200);
+    assert.equal(repeatRes.body.donorProfile.donor_id, onboardRes.body.donorProfile.donor_id);
+    assert.equal(repeatRes.body.donorProfile.phone, '9812345679');
+  });
+
+  test('POST /api/v1/users/donor-onboarding rejects invalid age under 18 according to DGHS standards', async () => {
+    const res = await request(app)
+      .post('/api/v1/users/donor-onboarding')
+      .set('Authorization', `Bearer ${donorToken}`)
+      .send({
+        full_name: 'Underage User',
+        blood_group: 'A+',
+        date_of_birth: '2015-01-01', // Under 18 years old
+        gender: 'Female',
+        phone: '9811122233',
+        city: 'Mumbai'
+      });
+
+    assert.equal(res.status, 400);
+    assert.equal(res.body.error, 'VALIDATION_FAILED');
+  });
+
+  test('POST /api/v1/users/donor-onboarding rejects non-donor role', async () => {
+    const res = await request(app)
+      .post('/api/v1/users/donor-onboarding')
+      .set('Authorization', `Bearer ${adminToken}`) // admin role
+      .send({
+        full_name: 'Admin Attempting Donor Onboarding',
+        blood_group: 'O-',
+        date_of_birth: '1990-01-01',
+        gender: 'Male',
+        phone: '9811122233',
+        city: 'Mumbai'
+      });
+
+    assert.equal(res.status, 403);
+  });
+
+  // ============================================================================
+  // Master Roadmap Phase Integration Tests
+  // ============================================================================
+
+  test('GET /api/v1/blood-safety/catalogue returns official screening test master catalogue', async () => {
+    const res = await request(app).get('/api/v1/blood-safety/catalogue');
+    assert.equal(res.status, 200);
+    assert.ok(Array.isArray(res.body.data));
+    const codes = res.body.data.map(t => t.test_code);
+    assert.ok(codes.includes('HIV'));
+    assert.ok(codes.includes('HBSAG'));
+    assert.ok(codes.includes('HCV'));
+    assert.ok(codes.includes('SYPHILIS'));
+    assert.ok(codes.includes('MALARIA'));
+  });
+
+  test('GET /api/v1/blood-safety/deferrals and POST /api/v1/blood-safety/deferrals track donor deferrals', async () => {
+    // 1. List deferrals with staff token
+    const listRes = await request(app)
+      .get('/api/v1/blood-safety/deferrals')
+      .set('Authorization', `Bearer ${staffToken}`);
+    assert.equal(listRes.status, 200);
+    assert.ok(Array.isArray(listRes.body.data));
+
+    // 2. Create a temporary deferral
+    const postRes = await request(app)
+      .post('/api/v1/blood-safety/deferrals')
+      .set('Authorization', `Bearer ${staffToken}`)
+      .send({
+        donor_id: 'DNR-2026-001',
+        type: 'Temporary',
+        category: 'Low_Hemoglobin',
+        reason: 'Hemoglobin 11.5 g/dL on repeat check; advised dietary counseling',
+        start_date: '2026-02-01',
+        end_date: '2026-05-01'
+      });
+    assert.equal(postRes.status, 201);
+    assert.ok(postRes.body.data.deferral_id);
+    assert.equal(postRes.body.data.category, 'Low_Hemoglobin');
+  });
+
+  test('GET /api/v1/inventory/summary and GET /api/v1/inventory/components return blood inventory data', async () => {
+    // 1. Inventory summary
+    const summaryRes = await request(app)
+      .get('/api/v1/inventory/summary')
+      .set('Authorization', `Bearer ${staffToken}`);
+    assert.equal(summaryRes.status, 200);
+    assert.ok(summaryRes.body.data.totals);
+    assert.equal(typeof summaryRes.body.data.totals.released, 'number');
+
+    // 2. List components with filter
+    const compRes = await request(app)
+      .get('/api/v1/inventory/components?status=Released')
+      .set('Authorization', `Bearer ${staffToken}`);
+    assert.equal(compRes.status, 200);
+    assert.ok(Array.isArray(compRes.body.data));
+  });
+
+  test('POST /api/v1/inventory/components derives component and PUT /api/v1/inventory/components/:code/status updates lifecycle', async () => {
+    const code = `TEST-PRBC-${Date.now()}`;
+    const createRes = await request(app)
+      .post('/api/v1/inventory/components')
+      .set('Authorization', `Bearer ${staffToken}`)
+      .send({
+        component_code: code,
+        unit_number: 'DON-2026-0619',
+        component_type: 'Packed Red Blood Cells',
+        volume_ml: 280,
+        storage_temperature_c: '2-6°C',
+        storage_location: 'Cold Room A Shelf 1',
+        expiry_date: '2026-03-01',
+        status: 'Released'
+      });
+    assert.equal(createRes.status, 201);
+    assert.equal(createRes.body.data.component_code, code);
+
+    // Update status to Transfused
+    const updateRes = await request(app)
+      .put(`/api/v1/inventory/components/${code}/status`)
+      .set('Authorization', `Bearer ${staffToken}`)
+      .send({
+        status: 'Transfused',
+        reason: 'Issued for trauma surgery at Apollo ICU'
+      });
+    assert.equal(updateRes.status, 200);
+    assert.equal(updateRes.body.data.status, 'Transfused');
+  });
+
+  test('Emergency blood request workflow: submit and update status', async () => {
+    // Submit emergency request
+    const createRes = await request(app)
+      .post('/api/v1/emergency-requests')
+      .send({
+        hospital_name: 'Max Superspeciality Saket',
+        blood_group: 'O-',
+        units_needed: 3,
+        urgency: 'Critical',
+        contact_person: 'Dr. Alok Verma',
+        contact_phone: '+91 98111 88990'
+      });
+    assert.equal(createRes.status, 201);
+    const reqId = createRes.body.data.request_id;
+    assert.ok(reqId);
+
+    // Update status to In_Progress with hospital coordinator token
+    const updateRes = await request(app)
+      .put(`/api/v1/emergency-requests/${reqId}/status`)
+      .set('Authorization', `Bearer ${hospitalToken}`)
+      .send({ status: 'In_Progress' });
+    assert.equal(updateRes.status, 200);
+    assert.equal(updateRes.body.data.status, 'In_Progress');
+  });
+
+  test('Campaigns workflow: create and update donation drive', async () => {
+    const createRes = await request(app)
+      .post('/api/v1/campaigns')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({
+        title: 'Community College Blood Camp',
+        organizer: 'Rotaract Club of Delhi',
+        location: 'College Auditorium, North Campus',
+        date: '2026-03-15',
+        start_time: '10:00:00',
+        end_time: '16:00:00',
+        target_units: 120,
+        status: 'Upcoming'
+      });
+    assert.equal(createRes.status, 201);
+    const campId = createRes.body.data.campaign_id;
+    assert.ok(campId);
+
+    // Update campaign
+    const updateRes = await request(app)
+      .put(`/api/v1/campaigns/${campId}`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ collected_units: 45, status: 'Active' });
+    assert.equal(updateRes.status, 200);
+    assert.equal(updateRes.body.data.collected_units, 45);
+  });
+
+  test('Reports and Analytics: summary and CSV export', async () => {
+    // 1. JSON summary
+    const summaryRes = await request(app)
+      .get('/api/v1/reports/summary')
+      .set('Authorization', `Bearer ${tmoToken}`);
+    assert.equal(summaryRes.status, 200);
+    assert.ok(summaryRes.body.data.monthlyDonations);
+    assert.ok(summaryRes.body.data.labOutcomes);
+    assert.ok(summaryRes.body.data.emergencyStats);
+
+    // 2. CSV export
+    const csvRes = await request(app)
+      .get('/api/v1/reports/export')
+      .set('Authorization', `Bearer ${adminToken}`);
+    assert.equal(csvRes.status, 200);
+    assert.ok(csvRes.text.includes('MediConnect Blood Surveillance'));
+  });
+
+  test('GET /api/v1/users/notifications returns role-tailored alerts', async () => {
+    // 1. Donor notifications
+    const donorRes = await request(app)
+      .get('/api/v1/users/notifications')
+      .set('Authorization', `Bearer ${donorToken}`);
+    assert.equal(donorRes.status, 200);
+    assert.ok(Array.isArray(donorRes.body.data));
+
+    // 2. TMO notifications
+    const tmoRes = await request(app)
+      .get('/api/v1/users/notifications')
+      .set('Authorization', `Bearer ${tmoToken}`);
+    assert.equal(tmoRes.status, 200);
+    assert.ok(Array.isArray(tmoRes.body.data));
+    assert.ok(tmoRes.body.data.some(n => n.type === 'clinical_review'));
   });
 });
