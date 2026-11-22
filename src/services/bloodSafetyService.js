@@ -280,6 +280,83 @@ export const bloodSafetyService = {
   },
 
   /**
+   * Retrieve all donor assessment records
+   */
+  async getDonorAssessments() {
+    return new Promise((resolve) => {
+      setTimeout(() => {
+        resolve({ data: [...assessments], total: assessments.length, status: 'success' });
+      }, 50);
+    });
+  },
+
+  /**
+   * Evaluate donor physical & questionnaire suitability against statutory DGHS/NBTC rules
+   */
+  evaluateDonorEligibility(assessmentData) {
+    const reasons = [];
+    const age = Number(assessmentData.donorAge);
+    if (age && (age < 18 || age > 65)) {
+      reasons.push(`Donor age ${age} is outside the statutory 18-65 years range.`);
+    }
+
+    const weight = Number(assessmentData.weightKg);
+    if (weight && weight < 45.0) {
+      reasons.push(`Body weight ${weight} kg is below statutory minimum 45.0 kg threshold.`);
+    }
+
+    const hb = Number(assessmentData.haemoglobinGdl);
+    if (hb && hb < 12.5) {
+      reasons.push(`Haemoglobin ${hb} g/dL is below statutory minimum 12.5 g/dL threshold.`);
+    }
+
+    const pulse = Number(assessmentData.pulseBpm);
+    if (pulse && (pulse < 60 || pulse > 100)) {
+      reasons.push(`Pulse rate ${pulse} bpm is outside 60-100 bpm regular physiological range.`);
+    }
+
+    const temp = Number(assessmentData.temperatureF || assessmentData.temperatureC);
+    if (temp && (temp > 99.5 || (temp < 45 && temp > 37.5))) {
+      reasons.push('Body temperature elevated (afebrile threshold exceeded).');
+    }
+
+    const daysSince = Number(assessmentData.daysSinceLastDonation);
+    if (daysSince) {
+      const isFemale = assessmentData.donorGender?.toLowerCase() === 'female';
+      const minDays = isFemale ? 120 : 90;
+      if (daysSince < minDays) {
+        reasons.push(`Interval since last donation (${daysSince} days) is less than statutory minimum (${minDays} days for ${isFemale ? 'females' : 'males'}).`);
+      }
+    }
+
+    const q = assessmentData.questionnaire || {};
+    if (q.takingPrescriptionAntibiotics) {
+      reasons.push('Active prescription antibiotic therapy (requires 14-day completion deferral).');
+    }
+    if (q.historyOfHepatitisOrJaundice) {
+      reasons.push('Medical history of hepatitis or jaundice (requires medical evaluation / permanent deferral).');
+    }
+    if (q.recentTattooOrPiercingInPast6Mo) {
+      reasons.push('Tattoo or body piercing within past 6-12 months (requires temporary deferral).');
+    }
+    if (q.recentDentalExtractionInPast72Hrs) {
+      reasons.push('Dental extraction or oral surgery within past 72 hours (requires temporary deferral).');
+    }
+    if (q.historyOfCardiacOrPulmonaryDisease) {
+      reasons.push('Severe cardiac or pulmonary disease (permanent deferral).');
+    }
+    if (q.recentVaccinationInPast14Days) {
+      reasons.push('Recent vaccination within past 14 days (temporary deferral).');
+    }
+
+    return {
+      isEligible: reasons.length === 0,
+      reasons,
+      recommendedOutcome: reasons.length === 0 ? 'Accepted for donation' : 'Temporarily deferred'
+    };
+  },
+
+  /**
    * Create a new pre-donation donor health assessment
    */
   async createDonorAssessment(assessmentData, user = { name: "Assessing Officer", role: "blood_bank" }) {

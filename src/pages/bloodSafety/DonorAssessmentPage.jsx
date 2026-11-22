@@ -69,10 +69,21 @@ export const DonorAssessmentPage = () => {
     loadAssessments();
   }, []);
 
-  const loadAssessments = () => {
-    setIsLoading(false);
-    setAssessments([...mockDonorAssessments]);
+  const loadAssessments = async () => {
+    setIsLoading(true);
+    try {
+      const res = await bloodSafetyService.getDonorAssessments();
+      setAssessments(res.data);
+    } catch (err) {
+      console.error('Failed to load donor assessments:', err);
+      setAssessments([...mockDonorAssessments]);
+    } finally {
+      setIsLoading(false);
+    }
   };
+
+  // Real-time regulatory eligibility assessment
+  const eligibilityEvaluation = bloodSafetyService.evaluateDonorEligibility(formData);
 
   const handleCreateAssessment = async (e) => {
     e.preventDefault();
@@ -394,6 +405,31 @@ export const DonorAssessmentPage = () => {
                   <option value="Permanently deferred">Permanently deferred (Regulatory)</option>
                 </Select>
               </div>
+
+              {/* Real-time Regulatory Vitals Clearance Guidance */}
+              {eligibilityEvaluation.isEligible ? (
+                <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-lg text-emerald-900 text-xs flex items-center gap-2">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                  <span>
+                    <strong>Statutory Parameters Satisfied:</strong> Donor vitals and intervals comply with DGHS / NBTC statutory criteria.
+                  </span>
+                </div>
+              ) : (
+                <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg text-amber-950 text-xs space-y-1">
+                  <div className="flex items-center gap-1.5 font-bold text-amber-800">
+                    <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
+                    <span>Regulatory Eligibility Advisory (DGHS / Drugs & Cosmetics Rules):</span>
+                  </div>
+                  <ul className="list-disc pl-5 space-y-0.5 text-[11px] text-amber-900">
+                    {eligibilityEvaluation.reasons.map((r, i) => (
+                      <li key={i}>{r}</li>
+                    ))}
+                  </ul>
+                  <div className="text-[10px] text-amber-700 italic pt-0.5">
+                    Recommended determination: <strong>{eligibilityEvaluation.recommendedOutcome}</strong>
+                  </div>
+                </div>
+              )}
 
               <div className="pt-2">
                 <Button type="submit" variant="primary" size="md" className="w-full">

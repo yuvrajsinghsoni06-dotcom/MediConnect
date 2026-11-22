@@ -85,6 +85,77 @@ describe('Blood Safety & Donor Health Verification System', () => {
     expect(allowed.data.length).toBeGreaterThan(0);
   });
 
+  it('evaluates donor eligibility against statutory DGHS physical criteria (TC-07 & TC-08)', () => {
+    // Underweight donor (< 45 kg)
+    const underweight = bloodSafetyService.evaluateDonorEligibility({
+      donorAge: 25,
+      weightKg: 42.0,
+      haemoglobinGdl: 13.0,
+      pulseBpm: 72,
+      donorGender: 'Female',
+    });
+    expect(underweight.isEligible).toBe(false);
+    expect(underweight.reasons.some((r) => r.includes('45.0 kg'))).toBe(true);
+    expect(underweight.recommendedOutcome).toBe('Temporarily deferred');
+
+    // Low Hemoglobin (< 12.5 g/dL)
+    const lowHb = bloodSafetyService.evaluateDonorEligibility({
+      donorAge: 28,
+      weightKg: 60.0,
+      haemoglobinGdl: 11.8,
+      pulseBpm: 76,
+      donorGender: 'Male',
+    });
+    expect(lowHb.isEligible).toBe(false);
+    expect(lowHb.reasons.some((r) => r.includes('12.5 g/dL'))).toBe(true);
+
+    // Insufficient Interval for male donor (< 90 days)
+    const shortIntervalMale = bloodSafetyService.evaluateDonorEligibility({
+      donorAge: 30,
+      weightKg: 70.0,
+      haemoglobinGdl: 14.5,
+      pulseBpm: 70,
+      donorGender: 'Male',
+      daysSinceLastDonation: 60,
+    });
+    expect(shortIntervalMale.isEligible).toBe(false);
+    expect(shortIntervalMale.reasons.some((r) => r.includes('90 days'))).toBe(true);
+
+    // Fully compliant donor
+    const compliant = bloodSafetyService.evaluateDonorEligibility({
+      donorAge: 32,
+      weightKg: 65.0,
+      haemoglobinGdl: 14.0,
+      pulseBpm: 74,
+      donorGender: 'Male',
+      daysSinceLastDonation: 95,
+      questionnaire: {
+        takingPrescriptionAntibiotics: false,
+        historyOfHepatitisOrJaundice: false,
+        recentTattooOrPiercingInPast6Mo: false,
+        recentDentalExtractionInPast72Hrs: false,
+      },
+    });
+    expect(compliant.isEligible).toBe(true);
+    expect(compliant.reasons.length).toBe(0);
+    expect(compliant.recommendedOutcome).toBe('Accepted for donation');
+  });
+
+  it('automatically triggers quarantine bio-lock on a donation when an assay is updated to Reactive (TC-03)', async () => {
+    // Update an assay of DON-2026-0891 to Reactive
+    const res = await bloodSafetyService.getDonationById('DON-2026-0891');
+    const firstTest = res.data.tests[0];
+
+    await bloodSafetyService.updateTestResult(firstTest.testId, {
+      resultStatus: 'Reactive',
+      notes: 'Automated repeat reactive verification',
+    }, { name: 'Lab Tech', role: 'lab_staff' });
+
+    const updatedDonation = await bloodSafetyService.getDonationById('DON-2026-0891');
+    expect(updatedDonation.data.donation.dispositionStatus).toBe('Quarantined');
+    expect(updatedDonation.data.releaseAudit.canRelease).toBe(false);
+  });
+
   it('renders Safety Dashboard page with key surveillance metrics', async () => {
     render(
       <MemoryRouter initialEntries={['/blood-safety']}>
