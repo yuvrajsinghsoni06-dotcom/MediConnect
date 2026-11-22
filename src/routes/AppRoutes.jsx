@@ -10,6 +10,7 @@ import { LoginPage } from '../pages/auth/LoginPage';
 import { RegisterPage } from '../pages/auth/RegisterPage';
 import { ForgotPasswordPage } from '../pages/auth/ForgotPasswordPage';
 import { NotFoundPage } from '../pages/public/NotFoundPage';
+import { ProfilePage } from '../pages/profile/ProfilePage';
 
 // Blood Safety & Donor Health Verification Module Pages
 import { SafetyAuthProvider } from '../context/SafetyAuthContext';
@@ -36,10 +37,13 @@ export const AppRoutes = () => {
           <Route path="/campaigns" element={<CampaignsPage />} />
           <Route path="/contact" element={<ContactPage />} />
 
-          {/* Authentication Pages */}
+          {/* Authentication & User Profile Pages */}
           <Route path="/login" element={<LoginPage />} />
           <Route path="/register" element={<RegisterPage />} />
           <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+          <Route path="/profile" element={<ProfilePage />} />
+          <Route path="/donor/dashboard" element={<ProfilePage />} />
+          <Route path="/donor/onboarding" element={<ProfilePage />} />
 
           {/* Blood Safety & Donor Health Verification Module */}
           <Route path="/blood-safety" element={<SafetyDashboardPage />} />

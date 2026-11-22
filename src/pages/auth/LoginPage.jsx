@@ -71,7 +71,7 @@ export const LoginPage = () => {
         return '/blood-safety/donations';
       case 'donor':
       default:
-        return '/find-donors';
+        return '/profile';
     }
   };
 

@@ -12,13 +12,15 @@ import {
   Lock,
   Phone,
   MapPin,
-  CheckCircle2
+  CheckCircle2,
+  AlertCircle
 } from 'lucide-react';
 import { Card } from '../../components/ui/Card';
 import { Input } from '../../components/ui/Input';
 import { Select } from '../../components/ui/Select';
 import { Button } from '../../components/ui/Button';
 import { PLATFORM_ROLES, MAJOR_CITIES, BLOOD_GROUPS } from '../../utils/constants';
+import api from '../../services/api';
 
 const registerSchema = z
   .object({
@@ -47,6 +49,7 @@ export const RegisterPage = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [demoSuccess, setDemoSuccess] = useState(false);
+  const [apiError, setApiError] = useState(null);
   const navigate = useNavigate();
 
   const {
@@ -72,9 +75,29 @@ export const RegisterPage = () => {
   const selectedRole = watch('role');
 
   const onSubmit = async (data) => {
-    // Frontend demo simulation
-    await new Promise((res) => setTimeout(res, 600));
-    setDemoSuccess(true);
+    setApiError(null);
+    try {
+      const response = await api.post('/auth/register', {
+        name: data.fullName.trim(),
+        email: data.email.trim(),
+        password: data.password,
+        phone: data.phoneNumber ? data.phoneNumber.trim() : undefined,
+        phoneNumber: data.phoneNumber ? data.phoneNumber.trim() : undefined,
+        city: data.city,
+        bloodGroup: data.bloodGroup || 'O+',
+        // role is ignored by server - securely defaulted to donor
+      });
+
+      if (response.data && response.data.success) {
+        setDemoSuccess(true);
+      } else {
+        throw new Error(response.data?.message || 'Registration failed.');
+      }
+    } catch (err) {
+      console.error('[Register] Request failed:', err);
+      const serverMessage = err.response?.data?.message || err.response?.data?.error || err.message;
+      setApiError(serverMessage || 'Failed to connect to authentication server. Please try again.');
+    }
   };
 
   return (
@@ -106,10 +129,10 @@ export const RegisterPage = () => {
                 <CheckCircle2 className="w-8 h-8" />
               </div>
               <h2 className="text-xl font-bold text-[#0F172A]">
-                Registration Demonstration Verified!
+                Account Created Successfully!
               </h2>
               <p className="text-xs text-[#64748B] leading-relaxed max-w-md mx-auto">
-                All input fields, role definitions, and password requirements passed client-side validation. In Stage 2, user credentials will be securely salted, hashed, and stored in the MySQL schema.
+                Your voluntary donor account has been registered and verified in the database. You can now sign in using your email and password.
               </p>
               <div className="pt-2">
                 <Button
@@ -124,6 +147,13 @@ export const RegisterPage = () => {
             </div>
           ) : (
             <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+              {/* Server / Network Error Alert */}
+              {apiError && (
+                <div className="p-3.5 rounded-xl bg-red-50 border border-red-200 text-xs text-red-700 flex items-start gap-2.5">
+                  <AlertCircle className="w-4 h-4 text-red-600 shrink-0 mt-0.5" />
+                  <span className="font-medium leading-relaxed">{apiError}</span>
+                </div>
+              )}
               {/* Account Role Selector */}
               <div>
                 <label className="block text-sm font-semibold text-[#0F172A] mb-1.5">

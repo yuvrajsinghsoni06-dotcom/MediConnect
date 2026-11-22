@@ -92,14 +92,27 @@ export const Navbar = () => {
 
               {isAuthenticated ? (
                 <div className="flex items-center gap-2">
-                  <div className="flex flex-col text-right">
+                  <Link
+                    to="/profile"
+                    className="flex flex-col text-right hover:opacity-80 transition-opacity"
+                    title="View My Profile"
+                  >
                     <span className="text-xs font-bold text-[#0F172A] leading-tight">
                       {currentUser.name}
                     </span>
                     <span className="text-[10px] font-semibold text-[#DC2626]">
-                      {currentRole.name}
+                      {currentRole.name} • Profile
                     </span>
-                  </div>
+                  </Link>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => navigate('/profile')}
+                    icon={UserCheck}
+                    className="text-xs text-slate-700 hover:text-[#DC2626]"
+                  >
+                    Profile
+                  </Button>
                   <Button
                     variant="ghost"
                     size="sm"
@@ -193,21 +206,38 @@ export const Navbar = () => {
               </Button>
               {isAuthenticated ? (
                 <div className="pt-2 border-t border-slate-100 flex items-center justify-between">
-                  <div className="flex flex-col">
-                    <span className="text-xs font-bold text-[#0F172A]">{currentUser.name}</span>
-                    <span className="text-[10px] text-[#DC2626] font-semibold">{currentRole.name}</span>
-                  </div>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => {
-                      setMobileMenuOpen(false);
-                      handleSignOut();
-                    }}
-                    icon={LogOut}
+                  <Link
+                    to="/profile"
+                    onClick={() => setMobileMenuOpen(false)}
+                    className="flex flex-col"
                   >
-                    Sign Out
-                  </Button>
+                    <span className="text-xs font-bold text-[#0F172A]">{currentUser.name}</span>
+                    <span className="text-[10px] text-[#DC2626] font-semibold">{currentRole.name} • View Profile</span>
+                  </Link>
+                  <div className="flex items-center gap-1.5">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        setMobileMenuOpen(false);
+                        navigate('/profile');
+                      }}
+                      icon={UserCheck}
+                    >
+                      Profile
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => {
+                        setMobileMenuOpen(false);
+                        handleSignOut();
+                      }}
+                      icon={LogOut}
+                    >
+                      Sign Out
+                    </Button>
+                  </div>
                 </div>
               ) : (
                 <div className="grid grid-cols-2 gap-2 pt-1">
