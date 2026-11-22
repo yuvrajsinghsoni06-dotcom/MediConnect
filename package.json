@@ -7,7 +7,13 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "test": "vitest run"
+    "test": "vitest run",
+    "test:frontend": "vitest run",
+    "test:backend": "cd backend && npm test",
+    "backend": "cd backend && npm start",
+    "backend:dev": "cd backend && npm run dev",
+    "backend:migrate": "cd backend && npm run db:migrate",
+    "backend:seed": "cd backend && npm run db:seed"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.1",

@@ -2,20 +2,25 @@ import axios from 'axios';
 
 /**
  * MediConnect Axios Client Instance
- * Configured for future Node.js / Express.js / MySQL backend integration.
+ * Configured for Node.js / Express.js / MySQL backend integration.
  */
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api',
-  timeout: 10000,
+  baseURL: import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api/v1',
+  timeout: 5000,
   headers: {
     'Content-Type': 'application/json',
   },
 });
 
-// Request interceptor (ready for JWT tokens in later stages)
+// Request interceptor: attach JWT bearer token if user is signed in
 api.interceptors.request.use(
   (config) => {
-    // In later stages, authentication tokens will be attached here
+    if (typeof window !== 'undefined' && window.localStorage) {
+      const token = window.localStorage.getItem('mediconnect_auth_token');
+      if (token) {
+        config.headers.Authorization = `Bearer ${token}`;
+      }
+    }
     return config;
   },
   (error) => Promise.reject(error)
@@ -25,7 +30,6 @@ api.interceptors.request.use(
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    // In later stages, standard backend error normalization will occur here
     return Promise.reject(error);
   }
 );
