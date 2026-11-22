@@ -17,8 +17,8 @@ if (env === 'production') {
   }
 }
 
-// Parse allowed CORS origins
-const rawCors = process.env.CORS_ORIGIN || 'http://localhost:5173,http://localhost:3000';
+// Parse allowed CORS origins (Strict whitelist: explicitly supports local Vite dev origins)
+const rawCors = process.env.CORS_ORIGIN || 'http://localhost:3000,http://localhost:5173,http://127.0.0.1:3000,http://127.0.0.1:5173';
 const allowedOrigins = rawCors.split(',').map(s => s.trim()).filter(Boolean);
 
 export const config = {

@@ -25,13 +25,22 @@ async function runMigrations() {
     connection = await mysql.createConnection(config);
     console.log('[MIGRATE] Connected successfully.');
 
-    const sqlPath = path.join(__dirname, 'migrations', '001_initial_schema.sql');
-    console.log('[MIGRATE] Reading migration file:', sqlPath);
-    const sql = fs.readFileSync(sqlPath, 'utf8');
+    const migrationsDir = path.join(__dirname, 'migrations');
+    const migrationFiles = fs.readdirSync(migrationsDir)
+      .filter(f => f.endsWith('.sql'))
+      .sort();
 
-    console.log('[MIGRATE] Executing initial schema migration...');
-    await connection.query(sql);
-    console.log('[MIGRATE] ✅ Migration completed successfully! Database `mediconnect_db` and all 13 tables created.');
+    console.log(`[MIGRATE] Found ${migrationFiles.length} migration file(s):`, migrationFiles);
+
+    for (const file of migrationFiles) {
+      const sqlPath = path.join(migrationsDir, file);
+      console.log(`[MIGRATE] Executing migration: ${file}...`);
+      const sql = fs.readFileSync(sqlPath, 'utf8');
+      await connection.query(sql);
+      console.log(`[MIGRATE] ✅ ${file} applied successfully.`);
+    }
+
+    console.log('[MIGRATE] 🎉 All migrations completed successfully!');
   } catch (err) {
     console.error('[MIGRATE] ❌ Migration failed:', err.message);
     process.exitCode = 1;

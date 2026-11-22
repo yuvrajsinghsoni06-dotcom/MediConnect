@@ -7,15 +7,15 @@
 USE `mediconnect_db`;
 
 -- 1. SEED USERS
--- Password hash corresponds to 'Password@123'
+-- Password hash corresponds to 'Password@123' ($2a$10$IxLWtwcFXlOtFl4SKpaoteAdQg6doSBkP/P.aAguW06ZYw4quP7/K)
 INSERT INTO `users` (`user_id`, `name`, `email`, `password_hash`, `role`, `department`, `is_active`) VALUES
-('USR-ADM-001', 'System Administrator', 'admin@mediconnect.local', '$2a$10$Qj7Vb8aI98fHk1W4d9g3ye6Lg1gPz2zWj5r1D1/1G3p1a1e1k1e1y', 'admin', 'IT & Systems', TRUE),
-('USR-BBS-001', 'Staff Nurse Rohit Verma', 'staff.rohit@mediconnect.local', '$2a$10$Qj7Vb8aI98fHk1W4d9g3ye6Lg1gPz2zWj5r1D1/1G3p1a1e1k1e1y', 'blood_bank_staff', 'Blood Bank Phlebotomy', TRUE),
-('USR-LAB-001', 'Technician Anita Rao', 'lab.anita@mediconnect.local', '$2a$10$Qj7Vb8aI98fHk1W4d9g3ye6Lg1gPz2zWj5r1D1/1G3p1a1e1k1e1y', 'lab_technician', 'Serology & Screening Lab', TRUE),
-('USR-TMO-001', 'Dr. Priya Nair (TMO)', 'dr.priya.tmo@mediconnect.local', '$2a$10$Qj7Vb8aI98fHk1W4d9g3ye6Lg1gPz2zWj5r1D1/1G3p1a1e1k1e1y', 'clinical_reviewer', 'Transfusion Medicine Quality Office', TRUE),
-('USR-DNR-001', 'Rahul Sharma', 'rahul.donor@mediconnect.local', '$2a$10$Qj7Vb8aI98fHk1W4d9g3ye6Lg1gPz2zWj5r1D1/1G3p1a1e1k1e1y', 'donor', 'Community Donors', TRUE),
-('USR-HSP-001', 'Coordinator Vikram Seth', 'coord.vikram@cityhospital.local', '$2a$10$Qj7Vb8aI98fHk1W4d9g3ye6Lg1gPz2zWj5r1D1/1G3p1a1e1k1e1y', 'hospital_coordinator', 'Apollo Emergency Transfusion Dept', TRUE)
-ON DUPLICATE KEY UPDATE `name`=VALUES(`name`);
+('USR-ADM-001', 'System Administrator', 'admin@mediconnect.local', '$2a$10$IxLWtwcFXlOtFl4SKpaoteAdQg6doSBkP/P.aAguW06ZYw4quP7/K', 'admin', 'IT & Systems', TRUE),
+('USR-BBS-001', 'Staff Nurse Rohit Verma', 'staff.rohit@mediconnect.local', '$2a$10$IxLWtwcFXlOtFl4SKpaoteAdQg6doSBkP/P.aAguW06ZYw4quP7/K', 'blood_bank_staff', 'Blood Bank Phlebotomy', TRUE),
+('USR-LAB-001', 'Technician Anita Rao', 'lab.anita@mediconnect.local', '$2a$10$IxLWtwcFXlOtFl4SKpaoteAdQg6doSBkP/P.aAguW06ZYw4quP7/K', 'lab_technician', 'Serology & Screening Lab', TRUE),
+('USR-TMO-001', 'Dr. Priya Nair (TMO)', 'dr.priya.tmo@mediconnect.local', '$2a$10$IxLWtwcFXlOtFl4SKpaoteAdQg6doSBkP/P.aAguW06ZYw4quP7/K', 'clinical_reviewer', 'Transfusion Medicine Quality Office', TRUE),
+('USR-DNR-001', 'Rahul Sharma', 'rahul.donor@mediconnect.local', '$2a$10$IxLWtwcFXlOtFl4SKpaoteAdQg6doSBkP/P.aAguW06ZYw4quP7/K', 'donor', 'Community Donors', TRUE),
+('USR-HSP-001', 'Coordinator Vikram Seth', 'coord.vikram@cityhospital.local', '$2a$10$IxLWtwcFXlOtFl4SKpaoteAdQg6doSBkP/P.aAguW06ZYw4quP7/K', 'hospital_coordinator', 'Apollo Emergency Transfusion Dept', TRUE)
+ON DUPLICATE KEY UPDATE `name`=VALUES(`name`), `password_hash`=VALUES(`password_hash`);
 
 -- 2. SEED DONORS
 INSERT INTO `donors` (`donor_id`, `user_id`, `full_name`, `blood_group`, `date_of_birth`, `gender`, `phone`, `email`, `city`, `state`, `total_donations`, `last_donation_date`) VALUES

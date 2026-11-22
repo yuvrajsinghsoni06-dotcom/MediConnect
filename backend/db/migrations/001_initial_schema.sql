@@ -247,7 +247,7 @@ CREATE TABLE IF NOT EXISTS `audit_logs` (
   `event_type` VARCHAR(80) NOT NULL,
   `record_id` VARCHAR(50) NOT NULL,
   `entity_type` VARCHAR(50) NOT NULL,
-  `actor_user_id` VARCHAR(50) NOT NULL,
+  `actor_user_id` VARCHAR(50) NULL,
   `actor_role` VARCHAR(50) NOT NULL,
   `ip_address` VARCHAR(45) NULL,
   `timestamp` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -255,5 +255,5 @@ CREATE TABLE IF NOT EXISTS `audit_logs` (
   INDEX `idx_audit_record` (`record_id`),
   INDEX `idx_audit_actor` (`actor_user_id`),
   INDEX `idx_audit_timestamp` (`timestamp`),
-  CONSTRAINT `fk_audit_actor` FOREIGN KEY (`actor_user_id`) REFERENCES `users` (`user_id`) ON DELETE RESTRICT ON UPDATE CASCADE
+  CONSTRAINT `fk_audit_actor` FOREIGN KEY (`actor_user_id`) REFERENCES `users` (`user_id`) ON DELETE SET NULL ON UPDATE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
