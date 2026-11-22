@@ -56,6 +56,7 @@ export const DonorAssessmentPage = () => {
       hadFoodWithin4Hours: true,
       takingPrescriptionAntibiotics: false,
       historyOfHepatitisOrJaundice: false,
+      recentTattooOrPiercingInPast12Mo: false,
       recentTattooOrPiercingInPast6Mo: false,
       recentDentalExtractionInPast72Hrs: false,
       historyOfCardiacOrPulmonaryDisease: false,
@@ -287,7 +288,7 @@ export const DonorAssessmentPage = () => {
                   </div>
                   <div className="flex items-center gap-1.5">
                     <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-                    <span>No recent tattoos / piercing (6 mo)</span>
+                    <span>No recent tattoos / piercing (12 mo, DGHS 2022)</span>
                   </div>
                   <div className="flex items-center gap-1.5">
                     <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />

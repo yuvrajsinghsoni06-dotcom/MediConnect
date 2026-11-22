@@ -373,22 +373,38 @@ export const bloodSafetyService = {
 
   /**
    * Evaluate donor physical & questionnaire suitability against statutory DGHS/NBTC rules
+   * Ref: DGHS Standards for Blood Centres 2nd Ed (2022) Section 3; Drugs & Cosmetics Rules Schedule F
    */
   evaluateDonorEligibility(assessmentData) {
     const reasons = [];
     const age = Number(assessmentData.donorAge);
     if (age && (age < 18 || age > 65)) {
-      reasons.push(`Donor age ${age} is outside the statutory 18-65 years range.`);
+      reasons.push(`Donor age ${age} is outside the statutory 18-65 years range (DGHS 2022 Sec 3.1).`);
     }
 
     const weight = Number(assessmentData.weightKg);
     if (weight && weight < 45.0) {
-      reasons.push(`Body weight ${weight} kg is below statutory minimum 45.0 kg threshold.`);
+      reasons.push(`Body weight ${weight} kg is below statutory minimum 45.0 kg threshold (DGHS 2022 Sec 3.2).`);
     }
 
     const hb = Number(assessmentData.haemoglobinGdl);
     if (hb && hb < 12.5) {
-      reasons.push(`Haemoglobin ${hb} g/dL is below statutory minimum 12.5 g/dL threshold.`);
+      reasons.push(`Haemoglobin ${hb} g/dL is below statutory minimum 12.5 g/dL threshold (Schedule F Part XII-B).`);
+    }
+
+    // Blood pressure validation: Systolic 100-160, Diastolic 60-100 mmHg
+    if (assessmentData.bloodPressure) {
+      const parts = assessmentData.bloodPressure.toString().replace(/[^0-9/]/g, '').split('/');
+      if (parts.length === 2) {
+        const sys = Number(parts[0]);
+        const dia = Number(parts[1]);
+        if (sys && (sys < 100 || sys > 160)) {
+          reasons.push(`Systolic blood pressure (${sys} mmHg) outside acceptable 100-160 mmHg range.`);
+        }
+        if (dia && (dia < 60 || dia > 100)) {
+          reasons.push(`Diastolic blood pressure (${dia} mmHg) outside acceptable 60-100 mmHg range.`);
+        }
+      }
     }
 
     const pulse = Number(assessmentData.pulseBpm);
@@ -397,8 +413,16 @@ export const bloodSafetyService = {
     }
 
     const temp = Number(assessmentData.temperatureF || assessmentData.temperatureC);
-    if (temp && (temp > 99.5 || (temp < 45 && temp > 37.5))) {
-      reasons.push('Body temperature elevated (afebrile threshold exceeded).');
+    if (temp) {
+      if (temp > 45) {
+        if (temp > 99.5 || temp < 96.8) {
+          reasons.push(`Body temperature (${temp}°F) outside normal oral range (96.8°F - 99.5°F).`);
+        }
+      } else {
+        if (temp > 37.5 || temp < 36.0) {
+          reasons.push(`Body temperature (${temp}°C) outside normal oral range (36.0°C - 37.5°C).`);
+        }
+      }
     }
 
     const daysSince = Number(assessmentData.daysSinceLastDonation);
@@ -406,7 +430,7 @@ export const bloodSafetyService = {
       const isFemale = assessmentData.donorGender?.toLowerCase() === 'female';
       const minDays = isFemale ? 120 : 90;
       if (daysSince < minDays) {
-        reasons.push(`Interval since last donation (${daysSince} days) is less than statutory minimum (${minDays} days for ${isFemale ? 'females' : 'males'}).`);
+        reasons.push(`Interval since last donation (${daysSince} days) is less than statutory minimum (${minDays} days for ${isFemale ? 'females' : 'males'}, DGHS 2022 Sec 3.3).`);
       }
     }
 
@@ -417,23 +441,28 @@ export const bloodSafetyService = {
     if (q.historyOfHepatitisOrJaundice) {
       reasons.push('Medical history of hepatitis or jaundice (requires medical evaluation / permanent deferral).');
     }
-    if (q.recentTattooOrPiercingInPast6Mo) {
-      reasons.push('Tattoo or body piercing within past 6-12 months (requires temporary deferral).');
+    if (q.recentTattooOrPiercingInPast12Mo || q.recentTattooOrPiercingInPast6Mo) {
+      reasons.push('Tattoo or body piercing within past 12 months requires 12-month deferral (DGHS 2022 Sec 3.4).');
     }
     if (q.recentDentalExtractionInPast72Hrs) {
-      reasons.push('Dental extraction or oral surgery within past 72 hours (requires temporary deferral).');
+      reasons.push('Dental extraction or oral surgery within past 72 hours (requires 3-day deferral, DGHS 2022 Sec 3.4).');
     }
     if (q.historyOfCardiacOrPulmonaryDisease) {
       reasons.push('Severe cardiac or pulmonary disease (permanent deferral).');
     }
     if (q.recentVaccinationInPast14Days) {
-      reasons.push('Recent vaccination within past 14 days (temporary deferral).');
+      reasons.push('Recent vaccination within past 14-28 days (requires temporary deferral).');
+    }
+    if (q.pregnancyOrLactation) {
+      reasons.push('Pregnancy or lactation requires 12-month deferral post-delivery (DGHS 2022 Sec 3.4).');
     }
 
     return {
       isEligible: reasons.length === 0,
       reasons,
-      recommendedOutcome: reasons.length === 0 ? 'Accepted for donation' : 'Temporarily deferred'
+      recommendedOutcome: reasons.length === 0 ? 'Accepted for donation' : 'Temporarily deferred',
+      regulatoryCitation: 'DGHS / MoHFW National Standards for Blood Centres 2nd Ed (2022)',
+      requiresMedicalOfficerReview: true
     };
   },
 
