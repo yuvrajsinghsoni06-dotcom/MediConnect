@@ -343,4 +343,21 @@ describe('MediConnect Backend API & Safety Safeguards Integration Tests', () => 
     assert.ok(res.body.data.every(u => u.quarantine_status === 'Released'));
     assert.ok(res.body.data.every(u => u.donor_name === 'CONFIDENTIAL / MASKED'));
   });
+
+  test('GET /api/v1/platform-stats returns aggregated network metrics', async () => {
+    const res = await request(app).get('/api/v1/platform-stats');
+    assert.equal(res.status, 200);
+    assert.ok(res.body.data.donors);
+    assert.ok(res.body.data.hospitals);
+    assert.ok(res.body.data.requests);
+    assert.ok(res.body.data.campaigns);
+  });
+
+  test('GET /api/v1/blood-safety/statistics returns surveillance metrics', async () => {
+    const res = await request(app).get('/api/v1/blood-safety/statistics');
+    assert.equal(res.status, 200);
+    assert.ok(res.body.data.donations);
+    assert.ok(res.body.data.tests);
+    assert.equal(typeof res.body.data.activeFollowUps, 'number');
+  });
 });

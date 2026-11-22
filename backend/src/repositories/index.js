@@ -646,3 +646,94 @@ export const AuditLogsRepository = {
     return logRecord;
   }
 };
+
+export const StatsRepository = {
+  async getPlatformStats() {
+    if (isDbConnected()) {
+      const [[{ donorCount }]] = await query('SELECT COUNT(*) as donorCount FROM donors');
+      const [[{ campaignCount }]] = await query('SELECT COUNT(*) as campaignCount FROM campaigns');
+      const [[{ requestCount }]] = await query('SELECT COUNT(*) as requestCount FROM emergency_requests');
+      const [[{ hospitalCount }]] = await query('SELECT COUNT(DISTINCT hospital_name) as hospitalCount FROM emergency_requests');
+      const [[{ releasedUnits }]] = await query('SELECT COUNT(*) as releasedUnits FROM blood_donations WHERE quarantine_status = "Released"');
+      const [[{ totalUnits }]] = await query('SELECT COUNT(*) as totalUnits FROM blood_donations');
+
+      return {
+        donors: { id: 'donors', label: 'Registered Donors', value: `${donorCount}`, numericValue: Number(donorCount) },
+        hospitals: { id: 'hospitals', label: 'Hospitals Connected', value: `${hospitalCount}`, numericValue: Number(hospitalCount) },
+        requests: { id: 'requests', label: 'Blood Requests Processed', value: `${requestCount}`, numericValue: Number(requestCount) },
+        campaigns: { id: 'campaigns', label: 'Active Campaigns', value: `${campaignCount}`, numericValue: Number(campaignCount) },
+        releasedUnits: { id: 'released', label: 'Released Units', value: `${releasedUnits}`, numericValue: Number(releasedUnits) },
+        totalUnits: { id: 'totalUnits', label: 'Total Units Screened', value: `${totalUnits}`, numericValue: Number(totalUnits) }
+      };
+    }
+    return {
+      donors: { id: 'donors', label: 'Registered Donors', value: '12', numericValue: 12 },
+      hospitals: { id: 'hospitals', label: 'Hospitals Connected', value: '4', numericValue: 4 },
+      requests: { id: 'requests', label: 'Blood Requests Processed', value: '5', numericValue: 5 },
+      campaigns: { id: 'campaigns', label: 'Active Campaigns', value: '5', numericValue: 5 },
+      releasedUnits: { id: 'released', label: 'Released Units', value: '3', numericValue: 3 },
+      totalUnits: { id: 'totalUnits', label: 'Total Units Screened', value: '8', numericValue: 8 }
+    };
+  },
+
+  async getSurveillanceStats() {
+    if (isDbConnected()) {
+      const [donationStats] = await query(`
+        SELECT 
+          COUNT(*) as total,
+          SUM(CASE WHEN quarantine_status = 'Released' THEN 1 ELSE 0 END) as approved,
+          SUM(CASE WHEN quarantine_status IN ('Quarantined', 'Bio_Lock') THEN 1 ELSE 0 END) as quarantined,
+          SUM(CASE WHEN quarantine_status = 'Pending_Review' THEN 1 ELSE 0 END) as underInvestigation,
+          SUM(CASE WHEN quarantine_status = 'Quarantined' AND quarantine_reason LIKE '%pending%' THEN 1 ELSE 0 END) as awaitingTesting,
+          SUM(CASE WHEN quarantine_status = 'Discarded' THEN 1 ELSE 0 END) as discarded
+        FROM blood_donations
+      `);
+
+      const [testStats] = await query(`
+        SELECT 
+          COUNT(*) as total,
+          SUM(CASE WHEN result = 'Pending' THEN 1 ELSE 0 END) as pending,
+          SUM(CASE WHEN result = 'Reactive' THEN 1 ELSE 0 END) as reactive,
+          SUM(CASE WHEN result = 'Inconclusive' THEN 1 ELSE 0 END) as inconclusive,
+          SUM(CASE WHEN result = 'Invalid' THEN 1 ELSE 0 END) as \`invalid\`,
+          SUM(CASE WHEN result = 'Non-Reactive' THEN 1 ELSE 0 END) as nonReactive
+        FROM laboratory_test_results
+      `);
+
+      const [[{ activeFollowUps }]] = await query(`
+        SELECT COUNT(*) as activeFollowUps FROM confidential_follow_ups WHERE communication_status != 'Completed'
+      `);
+
+      const d = donationStats[0] || {};
+      const t = testStats[0] || {};
+
+      return {
+        donations: {
+          total: Number(d.total || 0),
+          approved: Number(d.approved || 0),
+          quarantined: Number(d.quarantined || 0),
+          underInvestigation: Number(d.underInvestigation || 0),
+          awaitingTesting: Number(d.awaitingTesting || 0),
+          discarded: Number(d.discarded || 0)
+        },
+        tests: {
+          total: Number(t.total || 0),
+          pending: Number(t.pending || 0),
+          reactive: Number(t.reactive || 0),
+          inconclusive: Number(t.inconclusive || 0),
+          invalid: Number(t.invalid || 0),
+          nonReactive: Number(t.nonReactive || 0)
+        },
+        activeFollowUps: Number(activeFollowUps || 0),
+        lastUpdated: new Date().toISOString()
+      };
+    }
+
+    return {
+      donations: { total: 8, approved: 3, quarantined: 3, underInvestigation: 1, awaitingTesting: 2, discarded: 0 },
+      tests: { total: 35, pending: 5, reactive: 2, inconclusive: 0, invalid: 0, nonReactive: 28 },
+      activeFollowUps: 2,
+      lastUpdated: new Date().toISOString()
+    };
+  }
+};

@@ -7,7 +7,8 @@ import {
   ClinicalReviewsRepository,
   FollowUpsRepository,
   AuditLogsRepository,
-  DonorsRepository
+  DonorsRepository,
+  StatsRepository
 } from '../repositories/index.js';
 import {
   evaluateDonorVitals,
@@ -19,6 +20,18 @@ import { requireRole } from '../middleware/authorize.js';
 import { validateBody } from '../middleware/validator.js';
 
 const router = express.Router();
+
+// ============================================================================
+// 0. SURVEILLANCE & SCREENING METRICS
+// ============================================================================
+router.get('/statistics', async (req, res, next) => {
+  try {
+    const stats = await StatsRepository.getSurveillanceStats();
+    res.json({ success: true, data: stats });
+  } catch (err) {
+    next(err);
+  }
+});
 
 // ============================================================================
 // 1. DONOR ASSESSMENTS

@@ -3,7 +3,8 @@ import {
   DonorsRepository,
   CampaignsRepository,
   EmergencyRequestsRepository,
-  PublicDirectoryRepository
+  PublicDirectoryRepository,
+  StatsRepository
 } from '../repositories/index.js';
 
 const router = express.Router();
@@ -65,6 +66,16 @@ router.get('/emergency-requests', async (req, res, next) => {
   try {
     const requests = await EmergencyRequestsRepository.listAll();
     res.json({ success: true, data: requests });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// Live Platform Impact Statistics
+router.get('/platform-stats', async (req, res, next) => {
+  try {
+    const stats = await StatsRepository.getPlatformStats();
+    res.json({ success: true, data: stats });
   } catch (err) {
     next(err);
   }
