@@ -1,13 +1,20 @@
 import React, { useState } from 'react';
 import { Link, NavLink, useNavigate } from 'react-router-dom';
-import { Menu, X, Droplet, AlertCircle, UserPlus, LogIn } from 'lucide-react';
+import { Menu, X, Droplet, AlertCircle, UserPlus, LogIn, LogOut, UserCheck } from 'lucide-react';
 import { Button } from '../ui/Button';
 import { EmergencyRequestModal } from '../common/EmergencyRequestModal';
+import { useSafetyAuth } from '../../context/SafetyAuthContext';
 
 export const Navbar = () => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [isEmergencyModalOpen, setIsEmergencyModalOpen] = useState(false);
   const navigate = useNavigate();
+  const { isAuthenticated, currentUser, currentRole, logout } = useSafetyAuth();
+
+  const handleSignOut = () => {
+    logout();
+    navigate('/');
+  };
 
   const navLinks = [
     { name: 'Home', path: '/' },
@@ -83,23 +90,47 @@ export const Navbar = () => {
 
               <div className="h-6 w-px bg-slate-200 mx-1" />
 
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => navigate('/login')}
-                icon={LogIn}
-              >
-                Sign In
-              </Button>
+              {isAuthenticated ? (
+                <div className="flex items-center gap-2">
+                  <div className="flex flex-col text-right">
+                    <span className="text-xs font-bold text-[#0F172A] leading-tight">
+                      {currentUser.name}
+                    </span>
+                    <span className="text-[10px] font-semibold text-[#DC2626]">
+                      {currentRole.name}
+                    </span>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={handleSignOut}
+                    icon={LogOut}
+                    className="text-slate-600 hover:text-red-700"
+                  >
+                    Sign Out
+                  </Button>
+                </div>
+              ) : (
+                <>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => navigate('/login')}
+                    icon={LogIn}
+                  >
+                    Sign In
+                  </Button>
 
-              <Button
-                variant="primary"
-                size="sm"
-                onClick={() => navigate('/register')}
-                icon={UserPlus}
-              >
-                Register
-              </Button>
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    onClick={() => navigate('/register')}
+                    icon={UserPlus}
+                  >
+                    Register
+                  </Button>
+                </>
+              )}
             </div>
 
             {/* Mobile menu button */}
@@ -160,30 +191,50 @@ export const Navbar = () => {
               >
                 Emergency Blood Request
               </Button>
-              <div className="grid grid-cols-2 gap-2 pt-1">
-                <Button
-                  variant="secondary"
-                  size="md"
-                  onClick={() => {
-                    setMobileMenuOpen(false);
-                    navigate('/login');
-                  }}
-                  icon={LogIn}
-                >
-                  Sign In
-                </Button>
-                <Button
-                  variant="primary"
-                  size="md"
-                  onClick={() => {
-                    setMobileMenuOpen(false);
-                    navigate('/register');
-                  }}
-                  icon={UserPlus}
-                >
-                  Register
-                </Button>
-              </div>
+              {isAuthenticated ? (
+                <div className="pt-2 border-t border-slate-100 flex items-center justify-between">
+                  <div className="flex flex-col">
+                    <span className="text-xs font-bold text-[#0F172A]">{currentUser.name}</span>
+                    <span className="text-[10px] text-[#DC2626] font-semibold">{currentRole.name}</span>
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      setMobileMenuOpen(false);
+                      handleSignOut();
+                    }}
+                    icon={LogOut}
+                  >
+                    Sign Out
+                  </Button>
+                </div>
+              ) : (
+                <div className="grid grid-cols-2 gap-2 pt-1">
+                  <Button
+                    variant="secondary"
+                    size="md"
+                    onClick={() => {
+                      setMobileMenuOpen(false);
+                      navigate('/login');
+                    }}
+                    icon={LogIn}
+                  >
+                    Sign In
+                  </Button>
+                  <Button
+                    variant="primary"
+                    size="md"
+                    onClick={() => {
+                      setMobileMenuOpen(false);
+                      navigate('/register');
+                    }}
+                    icon={UserPlus}
+                  >
+                    Register
+                  </Button>
+                </div>
+              )}
             </div>
           </div>
         )}

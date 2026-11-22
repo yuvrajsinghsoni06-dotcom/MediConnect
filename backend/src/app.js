@@ -16,9 +16,16 @@ app.use(helmet({
   crossOriginResourcePolicy: { policy: 'cross-origin' }
 }));
 
-// Cross-Origin Resource Sharing
+// Cross-Origin Resource Sharing (Configured allowed origins only - no wildcard)
 app.use(cors({
-  origin: '*',
+  origin: (origin, callback) => {
+    if (!origin) return callback(null, true);
+    if (config.corsOrigin.includes(origin)) {
+      return callback(null, true);
+    }
+    return callback(new Error(`CORS Error: Origin '${origin}' is not allowed by MediConnect security policy.`));
+  },
+  credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
 }));

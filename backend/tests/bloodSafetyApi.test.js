@@ -1,9 +1,34 @@
-import { test, describe } from 'node:test';
+import { test, describe, before } from 'node:test';
 import assert from 'node:assert/strict';
 import request from 'supertest';
 import app from '../src/app.js';
 
 describe('MediConnect Backend API & Safety Safeguards Integration Tests', () => {
+  let adminToken;
+  let staffToken;
+  let labToken;
+  let tmoToken;
+  let donorToken;
+  let hospitalToken;
+
+  before(async () => {
+    // Authenticate demo roles to obtain JWT tokens
+    const [adminRes, staffRes, labRes, tmoRes, donorRes, hospitalRes] = await Promise.all([
+      request(app).post('/api/v1/auth/login').send({ email: 'admin@mediconnect.local', password: 'Password@123' }),
+      request(app).post('/api/v1/auth/login').send({ email: 'staff.rohit@mediconnect.local', password: 'Password@123' }),
+      request(app).post('/api/v1/auth/login').send({ email: 'lab.anita@mediconnect.local', password: 'Password@123' }),
+      request(app).post('/api/v1/auth/login').send({ email: 'dr.priya.tmo@mediconnect.local', password: 'Password@123' }),
+      request(app).post('/api/v1/auth/login').send({ email: 'rahul.donor@mediconnect.local', password: 'Password@123' }),
+      request(app).post('/api/v1/auth/login').send({ email: 'coord.vikram@cityhospital.local', password: 'Password@123' })
+    ]);
+
+    adminToken = adminRes.body.token;
+    staffToken = staffRes.body.token;
+    labToken = labRes.body.token;
+    tmoToken = tmoRes.body.token;
+    donorToken = donorRes.body.token;
+    hospitalToken = hospitalRes.body.token;
+  });
 
   test('GET /health returns healthy status', async () => {
     const res = await request(app).get('/health');
@@ -11,21 +36,56 @@ describe('MediConnect Backend API & Safety Safeguards Integration Tests', () => 
     assert.equal(res.body.status, 'healthy');
   });
 
-  test('POST /api/v1/auth/login authorizes demo user and returns JWT', async () => {
+  test('POST /api/v1/auth/login authorizes all 6 active demo users and issues signed JWT', async () => {
+    assert.ok(adminToken);
+    assert.ok(staffToken);
+    assert.ok(labToken);
+    assert.ok(tmoToken);
+    assert.ok(donorToken);
+    assert.ok(hospitalToken);
+  });
+
+  test('POST /api/v1/auth/login rejects unknown email with 401 INVALID_CREDENTIALS', async () => {
     const res = await request(app)
       .post('/api/v1/auth/login')
-      .send({ email: 'dr.priya.tmo@mediconnect.local', password: 'Password@123' });
+      .send({ email: 'unknown.stranger@example.com', password: 'Password@123' });
+
+    assert.equal(res.status, 401);
+    assert.equal(res.body.error, 'INVALID_CREDENTIALS');
+  });
+
+  test('POST /api/v1/auth/login rejects incorrect password with 401 INVALID_CREDENTIALS', async () => {
+    const res = await request(app)
+      .post('/api/v1/auth/login')
+      .send({ email: 'dr.priya.tmo@mediconnect.local', password: 'WrongPassword999!' });
+
+    assert.equal(res.status, 401);
+    assert.equal(res.body.error, 'INVALID_CREDENTIALS');
+  });
+
+  test('POST /api/v1/auth/login rejects deactivated account with 403 ACCOUNT_INACTIVE', async () => {
+    const res = await request(app)
+      .post('/api/v1/auth/login')
+      .send({ email: 'inactive.user@mediconnect.local', password: 'Password@123' });
+
+    assert.equal(res.status, 403);
+    assert.equal(res.body.error, 'ACCOUNT_INACTIVE');
+  });
+
+  test('GET /api/v1/auth/me returns profile for authenticated user', async () => {
+    const res = await request(app)
+      .get('/api/v1/auth/me')
+      .set('Authorization', `Bearer ${tmoToken}`);
 
     assert.equal(res.status, 200);
-    assert.equal(res.body.success, true);
-    assert.ok(res.body.token);
     assert.equal(res.body.user.role, 'clinical_reviewer');
   });
 
-  test('POST /api/v1/blood-safety/assessments evaluates DGHS vitals on server', async () => {
+  test('POST /api/v1/blood-safety/assessments evaluates DGHS vitals on server with staffToken', async () => {
     // Eligible donor
     const res = await request(app)
       .post('/api/v1/blood-safety/assessments')
+      .set('Authorization', `Bearer ${staffToken}`)
       .send({
         donor_id: 'DNR-2026-001',
         weight_kg: 70,
@@ -48,6 +108,7 @@ describe('MediConnect Backend API & Safety Safeguards Integration Tests', () => 
   test('POST /api/v1/blood-safety/assessments defers donor when vitals violate DGHS (Hb < 12.5 g/dL)', async () => {
     const res = await request(app)
       .post('/api/v1/blood-safety/assessments')
+      .set('Authorization', `Bearer ${staffToken}`)
       .send({
         donor_id: 'DNR-2026-002',
         weight_kg: 50,
@@ -71,6 +132,7 @@ describe('MediConnect Backend API & Safety Safeguards Integration Tests', () => 
   test('POST /api/v1/blood-safety/donations accessions unit with 5 mandatory pending lab tests in Quarantined status', async () => {
     const res = await request(app)
       .post('/api/v1/blood-safety/donations')
+      .set('Authorization', `Bearer ${staffToken}`)
       .send({
         donor_id: 'DNR-2026-001',
         assessment_id: 'ASM-2026-001',
@@ -93,9 +155,10 @@ describe('MediConnect Backend API & Safety Safeguards Integration Tests', () => 
   });
 
   test('PUT /api/v1/blood-safety/lab-tests/:id auto-locks donation under Bio_Lock when result is Reactive', async () => {
-    // Update LAB-0891-HIV to Reactive
+    // Update LAB-0891-HIV to Reactive using labToken
     const res = await request(app)
       .put('/api/v1/blood-safety/lab-tests/LAB-0891-HIV')
+      .set('Authorization', `Bearer ${labToken}`)
       .send({
         result: 'Reactive',
         test_kit_lot: 'LOT-TEST-REACT-1',
@@ -112,9 +175,10 @@ describe('MediConnect Backend API & Safety Safeguards Integration Tests', () => 
   });
 
   test('POST /api/v1/blood-safety/clinical-reviews strictly blocks release when unit has reactive or pending tests', async () => {
-    // Attempt to release DON-2026-0891 (which now has reactive HIV test)
+    // Attempt release on DON-2026-0891 (which has reactive HIV)
     const res = await request(app)
       .post('/api/v1/blood-safety/clinical-reviews')
+      .set('Authorization', `Bearer ${tmoToken}`)
       .send({
         unit_number: 'DON-2026-0891',
         decision: 'Released',
@@ -130,6 +194,7 @@ describe('MediConnect Backend API & Safety Safeguards Integration Tests', () => 
     // DON-2026-0619 has all 5 mandatory Non-Reactive tests
     const res = await request(app)
       .post('/api/v1/blood-safety/clinical-reviews')
+      .set('Authorization', `Bearer ${tmoToken}`)
       .send({
         unit_number: 'DON-2026-0619',
         decision: 'Released',
@@ -142,13 +207,7 @@ describe('MediConnect Backend API & Safety Safeguards Integration Tests', () => 
   });
 
   test('Role authorization rejects non-clinical reviewer from authorizing clinical release', async () => {
-    // Login as lab technician
-    const loginRes = await request(app)
-      .post('/api/v1/auth/login')
-      .send({ email: 'lab.anita@mediconnect.local', password: 'Password@123' });
-
-    const labToken = loginRes.body.token;
-
+    // Attempt clinical release using lab technician token
     const res = await request(app)
       .post('/api/v1/blood-safety/clinical-reviews')
       .set('Authorization', `Bearer ${labToken}`)
@@ -162,25 +221,49 @@ describe('MediConnect Backend API & Safety Safeguards Integration Tests', () => 
     assert.equal(res.body.error, 'INSUFFICIENT_PERMISSIONS');
   });
 
+  test('Protected mutation without token returns 401 UNAUTHORIZED', async () => {
+    const res = await request(app)
+      .post('/api/v1/blood-safety/clinical-reviews')
+      .send({
+        unit_number: 'DON-2026-0619',
+        decision: 'Released',
+        notes: 'No token supplied'
+      });
+
+    assert.equal(res.status, 401);
+    assert.equal(res.body.error, 'UNAUTHORIZED');
+  });
+
+  test('Donor Privacy Shield: GET /api/v1/donors NEVER exposes phone, email or date of birth', async () => {
+    const res = await request(app).get('/api/v1/donors');
+    assert.equal(res.status, 200);
+    assert.ok(res.body.data.length > 0);
+
+    res.body.data.forEach(donor => {
+      assert.equal(donor.phone, undefined, 'Phone must not be exposed in public API');
+      assert.equal(donor.email, undefined, 'Email must not be exposed in public API');
+      assert.equal(donor.date_of_birth, undefined, 'Date of birth must not be exposed in public API');
+      assert.ok(donor.blood_group);
+      assert.ok(donor.city);
+      assert.ok(donor.record_type);
+    });
+  });
+
+  test('GET /api/v1/public-centres returns verified e-RaktKosh blood directory', async () => {
+    const res = await request(app).get('/api/v1/public-centres');
+    assert.equal(res.status, 200);
+    assert.ok(res.body.data.length > 0);
+    assert.ok(res.body.source.includes('e-RaktKosh'));
+    assert.ok(res.body.data.every(c => c.verification_status && c.last_updated));
+  });
+
   test('Hospital coordinator view filters out unreleased inventory and masks PII', async () => {
     const res = await request(app)
       .get('/api/v1/blood-safety/donations?role=hospital_coordinator');
 
     assert.equal(res.status, 200);
     assert.ok(res.body.data.length > 0);
-    // Hospital coordinator must only see Released units
     assert.ok(res.body.data.every(u => u.quarantine_status === 'Released'));
-    // Hospital coordinator must see masked donor name
     assert.ok(res.body.data.every(u => u.donor_name === 'CONFIDENTIAL / MASKED'));
-  });
-
-  test('GET /api/v1/donors and /api/v1/campaigns return public data', async () => {
-    const donorsRes = await request(app).get('/api/v1/donors');
-    assert.equal(donorsRes.status, 200);
-    assert.ok(donorsRes.body.data.length > 0);
-
-    const campRes = await request(app).get('/api/v1/campaigns');
-    assert.equal(campRes.status, 200);
-    assert.ok(campRes.body.data.length > 0);
   });
 });

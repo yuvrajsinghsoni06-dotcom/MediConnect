@@ -48,48 +48,54 @@ router.get('/assessments', optionalAuthenticate, async (req, res, next) => {
   }
 });
 
-router.post('/assessments', optionalAuthenticate, validateBody(assessmentSchema), async (req, res, next) => {
-  try {
-    const actorUserId = req.user ? req.user.userId : 'USR-BBS-001';
-    const actorRole = req.user ? req.user.role : 'blood_bank_staff';
+router.post(
+  '/assessments',
+  authenticateToken,
+  requireRole('blood_bank_staff', 'admin'),
+  validateBody(assessmentSchema),
+  async (req, res, next) => {
+    try {
+      const actorUserId = req.user.userId;
+      const actorRole = req.user.role;
 
-    // Server-side authoritative vitals evaluation
-    const evaluation = evaluateDonorVitals(req.body);
-    const assessmentId = `ASM-2026-${Math.floor(100 + Math.random() * 900)}`;
+      // Server-side authoritative vitals evaluation
+      const evaluation = evaluateDonorVitals(req.body);
+      const assessmentId = `ASM-2026-${Math.floor(100 + Math.random() * 900)}`;
 
-    const assessmentData = {
-      assessment_id: assessmentId,
-      ...req.body,
-      status: evaluation.status,
-      deferral_reason: evaluation.flags.length > 0 ? evaluation.flags.join('; ') : null,
-      evaluator_user_id: actorUserId
-    };
-
-    const saved = await AssessmentsRepository.create(assessmentData);
-
-    await AuditLogsRepository.record({
-      eventType: 'DONOR_ASSESSMENT_RECORDED',
-      recordId: assessmentId,
-      entityType: 'donor_assessments',
-      actorUserId,
-      actorRole,
-      ipAddress: req.ip,
-      details: {
-        donor_id: req.body.donor_id,
+      const assessmentData = {
+        assessment_id: assessmentId,
+        ...req.body,
         status: evaluation.status,
-        flags: evaluation.flags
-      }
-    });
+        deferral_reason: evaluation.flags.length > 0 ? evaluation.flags.join('; ') : null,
+        evaluator_user_id: actorUserId
+      };
 
-    res.status(201).json({
-      success: true,
-      data: saved,
-      evaluation
-    });
-  } catch (err) {
-    next(err);
+      const saved = await AssessmentsRepository.create(assessmentData);
+
+      await AuditLogsRepository.record({
+        eventType: 'DONOR_ASSESSMENT_RECORDED',
+        recordId: assessmentId,
+        entityType: 'donor_assessments',
+        actorUserId,
+        actorRole,
+        ipAddress: req.ip,
+        details: {
+          donor_id: req.body.donor_id,
+          status: evaluation.status,
+          flags: evaluation.flags
+        }
+      });
+
+      res.status(201).json({
+        success: true,
+        data: saved,
+        evaluation
+      });
+    } catch (err) {
+      next(err);
+    }
   }
-});
+);
 
 // ============================================================================
 // 2. BLOOD DONATIONS & ACCESSIONING
@@ -143,71 +149,82 @@ router.get('/donations/:unitNumber/prerequisites', async (req, res, next) => {
   }
 });
 
-router.post('/donations', optionalAuthenticate, validateBody(donationSchema), async (req, res, next) => {
-  try {
-    const actorUserId = req.user ? req.user.userId : 'USR-BBS-001';
-    const actorRole = req.user ? req.user.role : 'blood_bank_staff';
+router.post(
+  '/donations',
+  authenticateToken,
+  requireRole('blood_bank_staff', 'admin'),
+  validateBody(donationSchema),
+  async (req, res, next) => {
+    try {
+      const actorUserId = req.user.userId;
+      const actorRole = req.user.role;
 
-    const unitNumber = `DON-2026-${Math.floor(100 + Math.random() * 900)}`;
-    const expiry = new Date();
-    expiry.setDate(expiry.getDate() + 35); // Whole blood 35 days shelf life
+      const unitNumber = `DON-2026-${Math.floor(100 + Math.random() * 900)}`;
+      const expiry = new Date();
+      expiry.setDate(expiry.getDate() + 35); // Whole blood 35 days shelf life
 
-    const donationData = {
-      unit_number: unitNumber,
-      expiry_date: expiry.toISOString().split('T')[0],
-      ...req.body
-    };
+      const donationData = {
+        unit_number: unitNumber,
+        expiry_date: expiry.toISOString().split('T')[0],
+        ...req.body
+      };
 
-    const created = await DonationsRepository.createCollectionTransaction(donationData, actorUserId);
+      const created = await DonationsRepository.createCollectionTransaction(donationData, actorUserId);
 
-    await AuditLogsRepository.record({
-      eventType: 'DONATION_ACCESSIONED',
-      recordId: unitNumber,
-      entityType: 'blood_donations',
-      actorUserId,
-      actorRole,
-      ipAddress: req.ip,
-      details: {
-        donor_id: req.body.donor_id,
-        blood_group: req.body.blood_group,
-        quarantine_status: 'Quarantined',
-        mandatory_tests_queued: 5
-      }
-    });
+      await AuditLogsRepository.record({
+        eventType: 'DONATION_ACCESSIONED',
+        recordId: unitNumber,
+        entityType: 'blood_donations',
+        actorUserId,
+        actorRole,
+        ipAddress: req.ip,
+        details: {
+          donor_id: req.body.donor_id,
+          blood_group: req.body.blood_group,
+          quarantine_status: 'Quarantined',
+          mandatory_tests_queued: 5
+        }
+      });
 
-    res.status(201).json({ success: true, data: created });
-  } catch (err) {
-    next(err);
-  }
-});
-
-router.put('/donations/:unitNumber/quarantine', optionalAuthenticate, async (req, res, next) => {
-  try {
-    const { status, reason } = req.body;
-    if (!status || !reason) {
-      return res.status(400).json({ success: false, message: 'status and reason are required' });
+      res.status(201).json({ success: true, data: created });
+    } catch (err) {
+      next(err);
     }
-
-    const actorUserId = req.user ? req.user.userId : 'USR-BBS-001';
-    const actorRole = req.user ? req.user.role : 'blood_bank_staff';
-
-    const updated = await DonationsRepository.updateQuarantineStatus(req.params.unitNumber, status, reason);
-
-    await AuditLogsRepository.record({
-      eventType: 'QUARANTINE_STATUS_UPDATED',
-      recordId: req.params.unitNumber,
-      entityType: 'blood_donations',
-      actorUserId,
-      actorRole,
-      ipAddress: req.ip,
-      details: { status, reason }
-    });
-
-    res.json({ success: true, data: updated });
-  } catch (err) {
-    next(err);
   }
-});
+);
+
+router.put(
+  '/donations/:unitNumber/quarantine',
+  authenticateToken,
+  requireRole('blood_bank_staff', 'clinical_reviewer', 'admin'),
+  async (req, res, next) => {
+    try {
+      const { status, reason } = req.body;
+      if (!status || !reason) {
+        return res.status(400).json({ success: false, message: 'status and reason are required' });
+      }
+
+      const actorUserId = req.user.userId;
+      const actorRole = req.user.role;
+
+      const updated = await DonationsRepository.updateQuarantineStatus(req.params.unitNumber, status, reason);
+
+      await AuditLogsRepository.record({
+        eventType: 'QUARANTINE_STATUS_UPDATED',
+        recordId: req.params.unitNumber,
+        entityType: 'blood_donations',
+        actorUserId,
+        actorRole,
+        ipAddress: req.ip,
+        details: { status, reason }
+      });
+
+      res.json({ success: true, data: updated });
+    } catch (err) {
+      next(err);
+    }
+  }
+);
 
 // ============================================================================
 // 3. LABORATORY SCREENING
@@ -237,32 +254,38 @@ const updateLabTestSchema = z.object({
   notes: z.string().optional()
 });
 
-router.put('/lab-tests/:resultId', optionalAuthenticate, validateBody(updateLabTestSchema), async (req, res, next) => {
-  try {
-    const actorUserId = req.user ? req.user.userId : 'USR-LAB-001';
-    const actorRole = req.user ? req.user.role : 'lab_technician';
+router.put(
+  '/lab-tests/:resultId',
+  authenticateToken,
+  requireRole('lab_technician', 'admin'),
+  validateBody(updateLabTestSchema),
+  async (req, res, next) => {
+    try {
+      const actorUserId = req.user.userId;
+      const actorRole = req.user.role;
 
-    const updated = await LabTestsRepository.updateResult(req.params.resultId, req.body, actorUserId);
+      const updated = await LabTestsRepository.updateResult(req.params.resultId, req.body, actorUserId);
 
-    await AuditLogsRepository.record({
-      eventType: 'LAB_RESULT_RECORDED',
-      recordId: req.params.resultId,
-      entityType: 'laboratory_test_results',
-      actorUserId,
-      actorRole,
-      ipAddress: req.ip,
-      details: {
-        result: req.body.result,
-        test_kit_lot: req.body.test_kit_lot,
-        unit_number: updated ? updated.unit_number : undefined
-      }
-    });
+      await AuditLogsRepository.record({
+        eventType: 'LAB_RESULT_RECORDED',
+        recordId: req.params.resultId,
+        entityType: 'laboratory_test_results',
+        actorUserId,
+        actorRole,
+        ipAddress: req.ip,
+        details: {
+          result: req.body.result,
+          test_kit_lot: req.body.test_kit_lot,
+          unit_number: updated ? updated.unit_number : undefined
+        }
+      });
 
-    res.json({ success: true, data: updated });
-  } catch (err) {
-    next(err);
+      res.json({ success: true, data: updated });
+    } catch (err) {
+      next(err);
+    }
   }
-});
+);
 
 // ============================================================================
 // 4. CLINICAL REVIEWS & DISPOSITION AUTHORIZATION
@@ -283,95 +306,99 @@ const clinicalReviewSchema = z.object({
   notes: z.string().min(1)
 });
 
-router.post('/clinical-reviews', optionalAuthenticate, validateBody(clinicalReviewSchema), async (req, res, next) => {
-  try {
-    const actorUserId = req.user ? req.user.userId : 'USR-TMO-001';
-    const actorRole = req.user ? req.user.role : 'clinical_reviewer';
+// Authoritative Clinical Review: STRICTLY restricted to Transfusion Medicine Officer (clinical_reviewer)
+router.post(
+  '/clinical-reviews',
+  authenticateToken,
+  requireRole('clinical_reviewer'),
+  validateBody(clinicalReviewSchema),
+  async (req, res, next) => {
+    try {
+      const actorUserId = req.user.userId;
+      const actorRole = req.user.role;
+      const { unit_number, decision, notes } = req.body;
 
-    // Role check: Only clinical reviewers can authorize release
-    if (actorRole !== 'clinical_reviewer' && actorRole !== 'admin') {
-      return res.status(403).json({
-        success: false,
-        error: 'INSUFFICIENT_PERMISSIONS',
-        message: 'Only authorized Transfusion Medicine Officers (clinical_reviewer) can authorize release.'
-      });
-    }
+      if (decision === 'Released') {
+        // Authoritative transactional verification of all 5 mandatory negative tests
+        const result = await ClinicalReviewsRepository.authorizeRelease(unit_number, actorUserId, notes);
 
-    const { unit_number, decision, notes } = req.body;
+        await AuditLogsRepository.record({
+          eventType: 'CLINICAL_DISPOSITION_APPROVED',
+          recordId: unit_number,
+          entityType: 'blood_donations',
+          actorUserId,
+          actorRole,
+          ipAddress: req.ip,
+          details: { decision: 'Released', notes, reviewId: result.reviewId }
+        });
 
-    if (decision === 'Released') {
-      // Authoritative transactional verification of all 5 mandatory negative tests
-      const result = await ClinicalReviewsRepository.authorizeRelease(unit_number, actorUserId, notes);
+        return res.json({ success: true, data: result });
+      }
+
+      // Non-release decisions (Quarantined, Discarded)
+      await DonationsRepository.updateQuarantineStatus(unit_number, decision, notes);
 
       await AuditLogsRepository.record({
-        eventType: 'CLINICAL_DISPOSITION_APPROVED',
+        eventType: 'CLINICAL_DISPOSITION_HOLD',
         recordId: unit_number,
         entityType: 'blood_donations',
         actorUserId,
         actorRole,
         ipAddress: req.ip,
-        details: { decision: 'Released', notes, reviewId: result.reviewId }
+        details: { decision, notes }
       });
 
-      return res.json({ success: true, data: result });
+      res.json({ success: true, message: `Unit marked as ${decision}` });
+    } catch (err) {
+      next(err);
     }
-
-    // Non-release decisions (Quarantined, Discarded)
-    await DonationsRepository.updateQuarantineStatus(unit_number, decision, notes);
-
-    await AuditLogsRepository.record({
-      eventType: 'CLINICAL_DISPOSITION_HOLD',
-      recordId: unit_number,
-      entityType: 'blood_donations',
-      actorUserId,
-      actorRole,
-      ipAddress: req.ip,
-      details: { decision, notes }
-    });
-
-    res.json({ success: true, message: `Unit marked as ${decision}` });
-  } catch (err) {
-    next(err);
   }
-});
+);
 
 // ============================================================================
 // 5. CONFIDENTIAL FOLLOW-UPS & AUDIT LOGS
 // ============================================================================
 
-router.get('/follow-ups', optionalAuthenticate, async (req, res, next) => {
-  try {
-    const role = req.user ? req.user.role : 'clinical_reviewer';
-    if (role === 'hospital_coordinator' || role === 'donor') {
-      return res.status(403).json({
-        success: false,
-        error: 'PII_PROTECTED',
-        message: 'Confidential follow-ups are protected medical records restricted to TMO and administrators.'
-      });
+router.get(
+  '/follow-ups',
+  authenticateToken,
+  requireRole('clinical_reviewer', 'admin'),
+  async (req, res, next) => {
+    try {
+      const list = await FollowUpsRepository.listAll();
+      res.json({ success: true, data: list });
+    } catch (err) {
+      next(err);
     }
-    const list = await FollowUpsRepository.listAll();
-    res.json({ success: true, data: list });
-  } catch (err) {
-    next(err);
   }
-});
+);
 
-router.put('/follow-ups/:caseId', optionalAuthenticate, async (req, res, next) => {
-  try {
-    const updated = await FollowUpsRepository.updateCase(req.params.caseId, req.body);
-    res.json({ success: true, data: updated });
-  } catch (err) {
-    next(err);
+router.put(
+  '/follow-ups/:caseId',
+  authenticateToken,
+  requireRole('clinical_reviewer', 'admin'),
+  async (req, res, next) => {
+    try {
+      const updated = await FollowUpsRepository.updateCase(req.params.caseId, req.body);
+      res.json({ success: true, data: updated });
+    } catch (err) {
+      next(err);
+    }
   }
-});
+);
 
-router.get('/audit-logs', optionalAuthenticate, async (req, res, next) => {
-  try {
-    const list = await AuditLogsRepository.listAll();
-    res.json({ success: true, data: list });
-  } catch (err) {
-    next(err);
+router.get(
+  '/audit-logs',
+  authenticateToken,
+  requireRole('clinical_reviewer', 'admin', 'blood_bank_staff'),
+  async (req, res, next) => {
+    try {
+      const list = await AuditLogsRepository.listAll();
+      res.json({ success: true, data: list });
+    } catch (err) {
+      next(err);
+    }
   }
-});
+);
 
 export default router;
